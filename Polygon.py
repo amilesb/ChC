@@ -12,6 +12,11 @@ class Polygon:
 
     POLYGON_DICT = {'triangle': 3, 'rectangle': 4, 'pentagon': 5, 'hexagon': 6}
 
+    def __repr__(self):
+        return (f'A {self.form} shape of width {self.cx*2} and height'
+               f' {self.cy*2} embedded in an array of size'
+               f' {self.input_array.shape} at angle {self.angle}')
+
     def __init__(self, array_size=128, form='rectangle', x=0, y=0,
                  width=5, height=5, angle=0):
         self.input_array = np.zeros([array_size,array_size])
@@ -25,7 +30,7 @@ class Polygon:
     def create_Simple_Polygon(self, form):
         ''' Returns the coordinates of the vertex points for a polygon of
         the specified shape.  Used for simple testing.'''
-    
+
         vertex_number = self.POLYGON_DICT[form]
         if vertex_number == 3:
             polygon_vertices = np.array([(-self.cy, 0),
@@ -65,13 +70,12 @@ class Polygon:
         non-self-intersecting polygon with the specified number of vertices
         which are by default 2 dimensional.'''
         polygon_vertices = np.zeros([vert_number, 2])
-        print(vert_number)
+        # np.random.seed(5) #for testing only
         for n in range(vert_number):
             angle = np.pi * np.random.uniform(0,2)
             x = Rmax * np.random.uniform(0,1) * np.cos(angle)
             y = Rmax * np.random.uniform(0,1) * np.sin(angle)
             polygon_vertices[n] = (x, y)
-            print(polygon_vertices)
 
         return polygon_vertices
 
@@ -106,21 +110,21 @@ class Polygon:
         else:
             if kwargs:
                 print(kwargs)
-            print('Array:')
-            print(array)
+                print('Array:')
+                print(array)
             img = Image.fromarray(np.uint8(array))
             plt.imshow(img, cmap='gray')
             plt.show()
-            img.save(f'test_{array.shape}_{kwargs["angle"]}_{kwargs["form"]}.png')
+            # for debugging:
+            # img.save(f'test_{array.shape}_{kwargs["angle"]}_{kwargs["form"]}.png')
 
     def blur_Array(self, sigma=0.5):
         '''Returns a Guassian blurring function applied across the 2d array.'''
         array = np.asarray(self.input_array, dtype=np.float64)
         # gaussian_filter is imported library function
-        blurred = gaussian_filter(array, sigma)
-        self.display_Polygon(blurred, angle=self.angle, form=self.form)
+        self.input_array = gaussian_filter(array, sigma)
 
-        return blurred
+        return self.input_array
 
     def create_Gradient(self, is_horizontal, start=None, stop=None, width=None):
         '''Return gradient across the image in either the horizontal or vertical
@@ -139,50 +143,18 @@ class Polygon:
             gradient = np.tile(np.linspace(start, stop, width), (height, 1))
         else:
             gradient = np.tile(np.linspace(start, stop, height), (width, 1)).T
-        print (self.input_array.shape)
-        print (gradient.shape)
         self.input_array += gradient
         self.input_array = np.clip(self.input_array, 0, 255)
-        self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
+        return self.input_array
 
     def add_Noise(self, scale=1):
         '''Add Gaussian noise to each array element to simulate effect of
         movement of a sensor.'''
+        # np.random.seed(5) # for testing
         noise = np.random.normal(0, scale, (self.input_array.shape))
         self.input_array += noise
         self.input_array = np.clip(self.input_array, 0, 255)
-        self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
+        # self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
         return self.input_array
-
-
-#### END OF FILE
-
-# test_rect = Polygon(array_size=12, form='rectangle', x = 5, y = 5, width=8,
-#                     height=6, angle = 0)
-# test_rect.insert_Polygon(display=True)
-# test_rect.create_Gradient(is_horizontal=True)
-# test_rect.create_Gradient(is_horizontal=False)
-# test_rect.add_Noise(2)
-# test_rect.blur_Array()
-
-# test_pent = Polygon(array_size=12, form='pentagon', x = 5, y = 5, width=9,
-#                     height=8, angle = 0)
-# test_pent.insert_Polygon(display=True)
-#
-# test_hex = Polygon(array_size=12, form='hexagon', x = 5, y = 5, width=8,
-#                     height=6, angle = 0)
-# test_hex.insert_Polygon(display=True)
-
-#
-# test_complex = Polygon(array_size=12, form='complex', x = 5, y = 5, width=8,
-#                        height=6, angle = 0)
-# test_complex.insert_Polygon(complex=True, display=True, vert_number=5, Rmax=7)
-# test_complex.add_Noise(25)
-# test_complex.blur_Array()
-
-
-# test_triangle = Polygon(array_size=16, form='triangle', x = 7, y = 7,
-#                         width=8, height=8, angle = 0)
-# test_triangle.insert_Polygon(display=True)
