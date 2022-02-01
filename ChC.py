@@ -2,6 +2,7 @@ import numpy as np
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 from pprint import pprint
+import random
 
 from Polygon import Polygon
 
@@ -36,38 +37,18 @@ class ChC:
         self.ChCs = {}
         self.PyC = {}
 
-    def create_ChC_Coords(self, debug=False):
+    def attach_ChC_Coords(self, debug=False):
         '''Accepts a Polygon object (numpy array with shape inserted) and returns a
         ChC dictionary object which defines coordinates for ChCs within the array.
         Note, for convenience the ChC are placed at equal intervals within the array
         with any miscellaneous extra selected randomly.'''
 
-        # ChC_Coordinates, PyC Points = create
-
-        ChC_Coordinates = []
-        PyC_points = [(i, j) for i in range(self.HT) for j in range(self.WD)]
-
-        if self.array_size > 3025:
-            # match ChC number to biological values in column
-            numberChC = self.array_size//300
-        else:
-            numberChC = 10 #serve as simple base value for smaller test cases
-        SPLIT = int(np.sqrt(numberChC))
-        REMAINING_ChC = numberChC-SPLIT**2
-
-        for i in range(1, SPLIT+1):
-            for j in range(1, SPLIT+1):
-                ChC_Coordinates.append((i*self.HT//SPLIT-np.ceil(SPLIT/2),
-                                    j*self.WD//SPLIT-np.ceil(SPLIT/2)))
-
-        for k in range(REMAINING_ChC):
-            ChC_Coordinates.append( (np.random.randint(0, self.HT),
-                                 np.random.randint(0, self.WD)) )
-
-        # build chandelier cell map to input
+        ChC_Coordinates, PyC_points = self.create_Coords()
         rng = default_rng()
-        percent_connected = 40
+
+        # build base chandelier cell map to input space
         for center in ChC_Coordinates:
+            percent_connected = np.random.randint(30,50)
             board = np.zeros((self.HT, self.WD), dtype=bool)
             N_points = min(round(board.size * percent_connected/100), 1200)
                        # 1200 is appx biological chc_connection value for ChC
@@ -87,25 +68,70 @@ class ChC:
                     P = np.exp(-dist/dist_char)
                     if rng.random() < P:
                         flat_board[idx] = True
-                        # if check_PyC_Connection():
-                        ''' need add reverse PyC chc_connection and check if too many
-                        if counter =8 can't attach.'''
-                        synaptic_strength = np.random.randint(1,9)
-                        endpoints.append({pt_coords: synaptic_strength})
+                        synapse_wght = np.random.randint(1,9)
+                        endpoints.append({pt_coords: synapse_wght})
                         N_points -= 1
             self.ChCs[center] = endpoints
 
         # build reciprocal map of input space to attached chandelier cells
         for point in PyC_points:
             attached_chcs = []
+            total_synapse_wght = 0
+            # Generate initial reciprocal mapping of input to ChCs
             for chc_point,connected_points in self.ChCs.items():
                 for attached_point in connected_points:
+                    chc_points_in_use = set()
                     if point in attached_point.keys():
-                        synaptic_strength = list(attached_point.values())[0]
-                        attached_chcs.append({chc_point: synaptic_strength})
+                        synapse_wght = list(attached_point.values())[0]
+                        attached_chcs.append({chc_point: synapse_wght})
+                        chc_points_in_use.add(chc_point)
+                        total_synapse_wght += synapse_wght
+
+            # ensure each input column connected to at least 4 chcs
+            while len(attached_chcs) < 4:
+                free_chcs = ChC_Coordinates - chc_points_in_use
+                new_connection = random.choice(list(free_chcs))
+                chc_points_in_use.add(new_connection)
+                synapse_wght = np.random.randint(1,9)
+                attached_chcs.append({new_connection: synapse_wght})
+                #update the ChC connection dictionary
+                self.ChCs[new_connection].append({point: synapse_wght})
+                total_synapse_wght += synapse_wght
+
+            # ensure each input column not over connected with ChCs
+            while len(attached_chcs) > 8 or total_synapse_wght > 40:
+                max_connected = list(attached_chcs[0].keys())
+                # dict_keys is unhashable type: solution is to convert to list
+                # and simply use first element.
+                for chc in attached_chcs:
+                    chc_point = list(chc.keys())
+                    print(chc_point)
+                    if len(self.ChCs[chc_point[0]]) > len(self.ChCs[max_connected[0]]):
+                        max_connected = chc
+                attached_chcs = [i for i in attached_chcs if not i.keys() == max_connected]
             self.PyC[point] = attached_chcs
 
+        return self.ChCs, self.PyC
 
+
+    def total_Synapse_Weight():
+        pass
+
+    def check_ChCs():
+        pass
+        # while chc_connect_more60%inputspace: disconnect ChC update PyC
+        # while chc connect < 20% : connect ChC update PyC
+
+    def check_PyC_Connection():
+        pass
+        #while len(attached_chcs)< 4
+        # while len (attached_chcs)>8  or total synapse wght > 40
+        # remove bulkiest and update ChC
+        # NOTE once this function defined can put into PyC map above
+
+
+    # note check_ChCs and check_PyC_Connection could create infinite loop so need logic to break out of
+    # like counter that gets passed back and forth a few times more than 3 than do X
 
         # if debug:
             # print ('ChC_Coordinates', ChC_Coordinates)
@@ -117,21 +143,36 @@ class ChC:
             # print('REMAINING_ChC:',REMAINING_ChC)
             # print('PyC points:', PyC_points)
 
-
-        return self.ChCs, self.PyC
-
-    ''' next need to reorganize so look at each pyc and check if at least 4 separate connections
-    if <4 find cell with at least 5 and randomly disconnect one provided it is not 1 already connected
-     and attach to other  continue for x time i.e. if same cells getting connected / disconeected then
-     add ChC'''
+            # plt.figure()
+            # for ep in endpoints:
+            #     plt.plot(*zip(center, ep), c = "red")
+            # plt.show()
 
 
-    # def check_PyC_Connection()
 
-''' next need to reorganize so look at each pyc and check if at least 4 separate connections
-if <4 find cell with at least 5 and randomly disconnect one provided it is not 1 already connected
- and attach to other  continue for x time i.e. if same cells getting connected / disconeected then
- add ChC'''
+    def create_Coords(self):
+        ChC_Coordinates = set()
+        PyC_points = [(i, j) for i in range(self.HT) for j in range(self.WD)]
+
+        if self.array_size > 3025:
+            # match ChC number to biological values in column
+            numberChC = self.array_size//300
+        else:
+            numberChC = 10 #serve as simple base value for smaller test cases
+        SPLIT = int(np.sqrt(numberChC))
+        REMAINING_ChC = numberChC-SPLIT**2
+
+        for i in range(1, SPLIT+1):
+            for j in range(1, SPLIT+1):
+                ChC_Coordinates.add( (i*self.HT//SPLIT-np.ceil(SPLIT/2),
+                                      j*self.WD//SPLIT-np.ceil(SPLIT/2)) )
+
+        for k in range(REMAINING_ChC):
+            ChC_Coordinates.add( (np.random.randint(0, self.HT),
+                                 np.random.randint(0, self.WD)) )
+
+        return ChC_Coordinates, PyC_points
+
 
 ''''each ChC connects to ~40% (effectlively 1200 PyC targets per ChC in column)
 of input space near it with 1-7 synapses per ChC.  Each PyC receives input from
@@ -140,16 +181,7 @@ connections.  12100/1200 = ~10 ChC for small column.'''
 
 
 test_ChC = ChC(test_shape)
-ChC_dict, pyc_dict = test_ChC.create_ChC_Coords(debug=True)
-
-# plt.figure()
-# for ep in endpoints:
-#     plt.plot(*zip(center, ep), c = "red")
-# plt.show()
-
-''' create super list that stores all cells connected in input space to check
-and make sure at least 4 but no more than 8...'''
-
+ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=True)
 
 
 pprint(ChC_dict)
