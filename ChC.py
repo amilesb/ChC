@@ -36,6 +36,10 @@ class ChC:
         self.array_size = Polygon_Array.input_array.size
         self.ChCs = {}
         self.PyC = {}
+        self.MIN_CHC_ATTACHED = 4
+        self.MAX_CHC_ATTACHED = 8
+        self.MAX_CHC_WEIGHT = 9
+        self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT = 40
 
     def attach_ChC_Coords(self, debug=False):
         '''Accepts a Polygon object (numpy array with shape inserted) and returns a
@@ -68,17 +72,33 @@ class ChC:
                     P = np.exp(-dist/dist_char)
                     if rng.random() < P:
                         flat_board[idx] = True
-                        synapse_wght = np.random.randint(1,9)
+                        synapse_wght = np.random.randint(0,self.MAX_CHC_WEIGHT)
                         endpoints.append({pt_coords: synapse_wght})
                         N_points -= 1
             self.ChCs[center] = endpoints
 
-        # build reciprocal map of input space to attached chandelier cells
         self.build_Reciprocal_Map_Of_Input_To_ChC()
+
+        if debug:
+            print ('self.ChC_Coordinates', self.ChC_Coordinates)
+            print('array size:',self.array_size)
+            print('ChC number:',numberChC)
+            print('height:',self.HT)
+            print('width:', self.WD)
+            print('Split:',SPLIT)
+            print('REMAINING_ChC:',REMAINING_ChC)
+            print('PyC points:', self.PyC_points)
+
+            plt.figure()
+            for ep in endpoints:
+                plt.plot(*zip(center, ep), c = "red")
+            plt.show()
 
         return self.ChCs, self.PyC
 
     def build_Reciprocal_Map_Of_Input_To_ChC(self):
+        '''Constructs a reciprocal connectivity map with synaptic weights from
+        input space to attached chandelier cells.'''
         for point in self.PyC_points:
             attached_chcs = []
             # Generate initial reciprocal mapping of input to ChCs
@@ -90,58 +110,47 @@ class ChC:
                         attached_chcs.append({chc_point: synapse_wght})
                         chc_points_in_use.add(chc_point)
 
+            self.check_PyC_Connection(attached_chcs, point, chc_points_in_use)
 
-
-            # ensure each input column connected to at least 4 chcs
-            while len(attached_chcs) < 4:
-                free_chcs = self.ChC_Coordinates - chc_points_in_use
-                new_connection = random.choice(list(free_chcs))
-                chc_points_in_use.add(new_connection)
-                synapse_wght = np.random.randint(1,9)
-                attached_chcs.append({new_connection: synapse_wght})
-                #add the new connection to ChC dictionary
-                self.ChCs[new_connection].append({point: synapse_wght})
-
-            self.PyC[point] = attached_chcs
             total_synapse_wght = self.total_Synapse_Weight(point)
             print('point:', point, 'total_synapse_wght:', total_synapse_wght)
-            if total_synapse_wght > 40:
+            if total_synapse_wght > 30:#self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
                 self.change_Synapse_Weight(connection=(point, attached_chcs))
 
 
-            ######## make this separate function
+    def check_PyC_Connection(self, attached_chcs, point, chc_points_in_use):
+        '''Checks each input cell to ensure at least 4 chandelier cells
+        connected and no more than 8. Updates both ChCs and PyC dictionaries.'''
 
+        while len(attached_chcs) < self.MIN_CHC_ATTACHED:
+            free_chcs = self.ChC_Coordinates - chc_points_in_use
+            new_connection = random.choice(list(free_chcs))
+            chc_points_in_use.add(new_connection)
+            synapse_wght = np.random.randint(0,self.MAX_CHC_WEIGHT)
+            attached_chcs.append({new_connection: synapse_wght})
+            #add the new connection to ChC dictionary
+            self.ChCs[new_connection].append({point: synapse_wght})
+        self.PyC[point] = attached_chcs
 
-            # ensure each input column not over connected with ChCs
-            stopper = 0
-            while len(attached_chcs) > 7 and stopper <100:
-                diconnected = []
-                # dict_keys is unhashable type: solution is to convert to list
-                # and simply use first element.
-                pt = [point]
-                max_connected = list(attached_chcs[0].keys())
-                print('point:', point)
-                print('length attached chcs:', len(attached_chcs))
-                print('attached_chcs:', attached_chcs)
-                for chc in attached_chcs:
-                    chc_point = list(chc.keys())
-                    print('chc_point:',chc_point)
-                    if len(self.ChCs[chc_point[0]]) > len(self.ChCs[max_connected[0]]):
-                        max_connected = chc_point
-                    print('max_connected:', max_connected)
-                attached_chcs = [i for i in attached_chcs if not
-                                 list(i.keys()) == max_connected]
-                print('new length of attached_chcs:', len(attached_chcs))
-                print('attached_chcs:', attached_chcs)
-                pyc_list = self.ChCs[max_connected[0]]
-                new_pyc = [i for i in pyc_list if not list(i.keys()) == pt]
-                print('length chc dict before:', len(self.ChCs[max_connected[0]]))
-                self.ChCs.update({max_connected[0]: new_pyc})
-                print('length chc dict after:', len(self.ChCs[max_connected[0]]))
+        stopper = 0
+        while len(attached_chcs) > self.MAX_CHC_ATTACHED and stopper <100:
+            # dict_keys is unhashable type: solution is to convert to list
+            # and simply use first element.
+            pt = [point]
+            print('point:', point)
+            max_connected = self.find_Max_Connected_ChC(attached_chcs)
+            attached_chcs = [i for i in attached_chcs if not
+                             list(i.keys()) == max_connected]
+            print('new length of attached_chcs:', len(attached_chcs))
+            print('attached_chcs:', attached_chcs)
+            pyc_list = self.ChCs[max_connected[0]]
+            new_pyc = [i for i in pyc_list if not list(i.keys()) == pt]
+            print('length chc dict before:', len(self.ChCs[max_connected[0]]))
+            self.ChCs.update({max_connected[0]: new_pyc})
+            print('length chc dict after:', len(self.ChCs[max_connected[0]]))
+            stopper += 1
+        self.PyC[point] = attached_chcs
 
-                stopper += 1
-
-            self.PyC[point] = attached_chcs
 
     def total_Synapse_Weight(self, PyC_array_element):
         '''Takes a point in the PyC input space and returns the total synapse
@@ -149,81 +158,133 @@ class ChC:
         return sum([list(chc.values())[0] for chc in self.PyC[PyC_array_element]])
 
 
-    def change_Synapse_Weight(self, connection, change=None):
+    def find_Max_Connected_ChC(self, attached_chcs):
+        '''Takes a list of attached chandelier cells and returns the one with
+        the most connections to the input space.'''
+        max_connected = list(attached_chcs[0].keys())
+        print('length attached chcs:', len(attached_chcs))
+        print('attached_chcs:', attached_chcs)
+        for chc in attached_chcs:
+            chc_point = list(chc.keys())
+            print('chc_point:',chc_point)
+            if len(self.ChCs[chc_point[0]]) > len(self.ChCs[max_connected[0]]):
+                max_connected = chc_point
+            print('max_connected:', max_connected)
+        return max_connected
+
+
+    def find_Least_Connected_ChC(self, attached_chcs):
+        '''Takes a list of attached chandelier cells and returns the one with
+        the least connections to the input space.'''
+        least_connected = list(attached_chcs[0].keys())
+        for chc in attached_chcs:
+            chc_point = list(chc.keys())
+            if len(self.ChCs[chc_point[0]]) < len(self.ChCs[least_connected[0]]):
+                least_connected = chc_point
+        return least_connected
+
+
+    def change_Synapse_Weight(self, connection,
+                              change='RANDOM', target_tot_wght=None):
         '''Connection is a tuple representing the connection between a list of
         chandelier cell points with a connected point in the input space.
         Change is the weight change of the synapse.  The function returns a new
         total synapse weight for the connected chandelier cells along with
         updated individual weights for each chandelier cell.'''
-        PyC_key, ChC_keys = connection
-        current_Total_Weight = self.total_Synapse_Weight(PyC_key)
-        if change:
-            new_Weight = current_Total_Weight + change
-            new_Weight = self.check_Weight_Change(new_Weight)
-        else:
-            new_Weight = current_Total_Weight + np.random.randint(1,41)
-        while new_Weight > current_Total_Weight:
-            #reduce individual chc weights update both dicts
-            pass
-        while new_Weight < current_Total_Weight:
-            #increase individual chc weights update both dicts
-            pass
+        PyC_point, attached_chcs = connection
+        current_tot_wght = self.total_Synapse_Weight(PyC_point)
+        FLAG_NEW_CONNECTION = False
 
-    def check_Weight_Change(self, new_Weight):
-        ''' Check that total weight is between 0-40'''
-        if new_Weight < 0:
+        if change == 'RANDOM':
+            target_tot_wght = np.random.randint(0,self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT)
+
+        if target_tot_wght:
+            target_tot_wght = target_tot_wght
+        else:
+            target_tot_wght = current_tot_wght+change
+            target_tot_wght = self.check_Weight_Change(target_tot_wght)
+
+        chc_lengths = []
+        for attached in attached_chcs:
+            chc = list(attached.keys())
+            chc_lengths.append(len(chc[0]))
+        index = list(range(len(chc_lengths)))
+        print('target_tot_wght', target_tot_wght)
+        print('current_tot_wght', current_tot_wght)
+
+        if target_tot_wght<current_tot_wght:
+            inc = -1
+            flipped = [-x for x in chc_lengths]
+            chc_lengths_copy = [x for x in chc_lengths]
+            weights_in_reverse = [None] * len(chc_lengths)
+            for i in range(len(flipped)):
+                index_F = flipped.index(max(flipped))
+                flipped[index_F] = -10^80
+                index_C = chc_lengths_copy.index(max(chc_lengths_copy))
+                max_wt = chc_lengths_copy.pop(index_C)
+                weights_in_reverse[index_F] = max_wt
+            chc_index = random.choices(index, weights=weights_in_reverse)
+        else:
+            inc = 1
+            chc_index = random.choices(index, weights=chc_lengths)
+
+        chc = attached_chcs[chc_index[0]]
+        chc_pt = list(chc.keys())[0]
+
+        if 0 <= chc[chc_pt]+inc < self.MAX_CHC_WEIGHT:
+            chc[chc_pt] += inc
+        elif inc==1 and len(attached_chcs) < self.MAX_CHC_ATTACHED:
+            free_chcs = self.ChC_Coordinates-set([i.keys() for i in attached_chcs])
+            new_connection = self.find_Least_Connected_ChC(list(free_chcs))
+            attached_chcs.append({new_connection: 1})
+            FLAG_NEW_CONNECTION = True
+        else:
+            print('inc', inc)
+            unchecked_chcs = [x for i,x in enumerate(attached_chcs)
+                              if i!=chc_index and
+                              0 <= list(x.values())[0]+inc < self.MAX_CHC_WEIGHT]
+            print('attached_chcs', attached_chcs)
+            print('unchecked_chcs', unchecked_chcs)
+            chc = random.choice(unchecked_chcs)
+            chc_pt = list(chc.keys())[0]
+            chc[chc_pt] += inc
+        # update both dictionaries
+        self.PyC[PyC_point] = attached_chcs
+        attached_pycs = self.ChCs[chc_pt]
+        for attached_pyc in attached_pycs:
+            if list(attached_pyc.keys())[0] == [PyC_point]:
+                attached_pyc = {PyC_point: chc[chc_pt]}
+        if FLAG_NEW_CONNECTION:
+            attached_pycs.append({PyC_point: 1})
+        self.ChCs.update({chc_pt: attached_pycs})
+
+        current_tot_wght = current_tot_wght+inc
+        new_change = current_tot_wght-target_tot_wght
+
+        if new_change != 0:
+            self.change_Synapse_Weight(connection, change=new_change,
+                                       target_tot_wght=target_tot_wght)
+        else:
+            return
+
+    def check_Weight_Change(self, target_tot_wght):
+        ''' Check that total weight is between 0-total max ChC attached wght'''
+        if target_tot_wght < 0:
             return 0
-        elif new_Weight > 39:
-            return 40
+        elif target_tot_wght > self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
+            return self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         else:
-            return new_Weight
-
-# note check_ChCs and check_PyC_Connection could create infinite loop so need logic to break out of
-# like counter that gets passed back and forth a few times more than 3 than do X
+            return target_tot_wght
 
     def check_ChCs(self):
         pass
         # while chc_connect_more60%inputspace: disconnect ChC update PyC
         # while chc connect < 20% : connect ChC update PyC
 
-    def check_PyC_Connection():
-        pass
-        #while len(attached_chcs)< 4
-        # while len (attached_chcs)>8  or total synapse wght > 40
-        # remove bulkiest and update ChC
-        # NOTE once this function defined can put into PyC map above
-
-
-# # If decide to go observer route
-# class Synapse:
-#     def __init__(self):
-#         self.observers = []
-#         self._connection = None
-#         self._weight = 0
-
-    def update_Synapse_Wght(self):
-        pass
-    #  need to create observer like method here for each dictionary
-
-
-        # if debug:
-            # print ('self.ChC_Coordinates', self.ChC_Coordinates)
-            # print('array size:',self.array_size)
-            # print('ChC number:',numberChC)
-            # print('height:',self.HT)
-            # print('width:', self.WD)
-            # print('Split:',SPLIT)
-            # print('REMAINING_ChC:',REMAINING_ChC)
-            # print('PyC points:', self.PyC_points)
-
-            # plt.figure()
-            # for ep in endpoints:
-            #     plt.plot(*zip(center, ep), c = "red")
-            # plt.show()
-
-
 
     def create_Coords(self):
+        '''Generate a set of coordinates for each chandelier cell along with a
+        list of points in the input space.'''
         self.ChC_Coordinates = set()
         self.PyC_points = [(i, j) for i in range(self.HT) for j in range(self.WD)]
 
@@ -254,7 +315,7 @@ connections.  12100/1200 = ~10 ChC for small column.'''
 
 
 test_ChC = ChC(test_shape)
-ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=True)
+ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
 
 
 pprint(ChC_dict)
