@@ -159,8 +159,9 @@ class ChC:
 
 
     def find_Max_Connected_ChC(self, attached_chcs):
-        '''Takes a list of attached chandelier cells and returns the one with
-        the most connections to the input space.'''
+        '''Takes a list of attached chandelier cells in dictionary form with
+        their corresponding weights and returns the one with the most
+        connections to the input space.'''
         max_connected = list(attached_chcs[0].keys())
         print('length attached chcs:', len(attached_chcs))
         print('attached_chcs:', attached_chcs)
@@ -174,13 +175,14 @@ class ChC:
 
 
     def find_Least_Connected_ChC(self, attached_chcs):
-        '''Takes a list of attached chandelier cells and returns the one with
-        the least connections to the input space.'''
-        least_connected = list(attached_chcs[0].keys())
-        for chc in attached_chcs:
-            chc_point = list(chc.keys())
-            if len(self.ChCs[chc_point[0]]) < len(self.ChCs[least_connected[0]]):
-                least_connected = chc_point
+        '''Takes a list of attached chandelier cells as tuples (without their
+        corresponding weights) and returns the one with the least connections to
+        the input space.'''
+        print('least connected function attached chcs', attached_chcs)
+        least_connected = attached_chcs[0]
+        for chc_pt in attached_chcs:
+            if len(self.ChCs[chc_pt]) < len(self.ChCs[least_connected]):
+                least_connected = chc_pt
         return least_connected
 
 
@@ -198,35 +200,14 @@ class ChC:
         if change == 'RANDOM':
             target_tot_wght = np.random.randint(0,self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT)
 
-        if target_tot_wght:
+        if target_tot_wght or target_tot_wght==0:
             target_tot_wght = target_tot_wght
         else:
             target_tot_wght = current_tot_wght+change
             target_tot_wght = self.check_Weight_Change(target_tot_wght)
 
-        chc_lengths = []
-        for attached in attached_chcs:
-            chc = list(attached.keys())
-            chc_lengths.append(len(chc[0]))
-        index = list(range(len(chc_lengths)))
-        print('target_tot_wght', target_tot_wght)
-        print('current_tot_wght', current_tot_wght)
-
-        if target_tot_wght<current_tot_wght:
-            inc = -1
-            flipped = [-x for x in chc_lengths]
-            chc_lengths_copy = [x for x in chc_lengths]
-            weights_in_reverse = [None] * len(chc_lengths)
-            for i in range(len(flipped)):
-                index_F = flipped.index(max(flipped))
-                flipped[index_F] = -10^80
-                index_C = chc_lengths_copy.index(max(chc_lengths_copy))
-                max_wt = chc_lengths_copy.pop(index_C)
-                weights_in_reverse[index_F] = max_wt
-            chc_index = random.choices(index, weights=weights_in_reverse)
-        else:
-            inc = 1
-            chc_index = random.choices(index, weights=chc_lengths)
+        inc, chc_index = self.select_Chand(target_tot_wght, current_tot_wght,
+                                           attached_chcs)
 
         chc = attached_chcs[chc_index[0]]
         chc_pt = list(chc.keys())[0]
@@ -234,7 +215,8 @@ class ChC:
         if 0 <= chc[chc_pt]+inc < self.MAX_CHC_WEIGHT:
             chc[chc_pt] += inc
         elif inc==1 and len(attached_chcs) < self.MAX_CHC_ATTACHED:
-            free_chcs = self.ChC_Coordinates-set([i.keys() for i in attached_chcs])
+            free_chcs = self.ChC_Coordinates-set([list(i.keys())[0] for
+                                                  i in attached_chcs])
             new_connection = self.find_Least_Connected_ChC(list(free_chcs))
             attached_chcs.append({new_connection: 1})
             FLAG_NEW_CONNECTION = True
@@ -268,7 +250,9 @@ class ChC:
             return
 
     def check_Weight_Change(self, target_tot_wght):
-        ''' Check that total weight is between 0-total max ChC attached wght'''
+        ''' Check that total weight is between 0 and the total allowed max ChC
+        attached weight.  Return the target total weight satisfying the above
+        bound.'''
         if target_tot_wght < 0:
             return 0
         elif target_tot_wght > self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
@@ -276,11 +260,42 @@ class ChC:
         else:
             return target_tot_wght
 
+    def select_Chand(self, target_tot_wght, current_tot_wght, attached_chcs):
+        '''Creates a weighted list of chandelier cell indexes from the
+        attached_chcs to randomly choose from to adjust weight on.  Function
+        returns chandelier cell index as a list with 1 element and the increment
+        to adjust (either +1 or -1).'''
+        chc_lengths = []
+        for attached in attached_chcs:
+            chc = list(attached.keys())
+            chc_lengths.append(len(chc[0]))
+        index = list(range(len(chc_lengths)))
+        print('target_tot_wght', target_tot_wght)
+        print('current_tot_wght', current_tot_wght)
+
+        if target_tot_wght<current_tot_wght:
+            inc = -1
+            flipped = [-x for x in chc_lengths]
+            chc_lengths_copy = [x for x in chc_lengths]
+            weights_in_reverse = [None] * len(chc_lengths)
+            for i in range(len(flipped)):
+                index_F = flipped.index(max(flipped))
+                flipped[index_F] = -10^80
+                index_C = chc_lengths_copy.index(max(chc_lengths_copy))
+                max_wt = chc_lengths_copy.pop(index_C)
+                weights_in_reverse[index_F] = max_wt
+            chc_index = random.choices(index, weights=weights_in_reverse)
+        else:
+            inc = 1
+            chc_index = random.choices(index, weights=chc_lengths)
+
+        return inc, chc_index
+
+
     def check_ChCs(self):
         pass
         # while chc_connect_more60%inputspace: disconnect ChC update PyC
         # while chc connect < 20% : connect ChC update PyC
-
 
     def create_Coords(self):
         '''Generate a set of coordinates for each chandelier cell along with a
@@ -308,6 +323,20 @@ class ChC:
         return self.ChC_Coordinates, self.PyC_points
 
 
+    def sort_ChC(self):
+        '''For each chandelier cell, this function sorts the list of connected
+        points for easier viewing.'''
+        for chc_pt in self.ChC_Coordinates:
+            connected_points = self.ChCs[chc_pt]
+            connected_points.sort(key=lambda x: list(x.keys())[0])
+
+    def sort_PyC(self):
+        '''For each pyramidal cell column in the input space, this function
+        sorts the list of connected chandelier cells for easier viewing.'''
+        for pyc_pt in self.PyC_points:
+            connected_chcs = self.PyC[pyc_pt]
+            connected_chcs.sort(key=lambda x: list(x.keys())[0])
+
 ''''each ChC connects to ~40% (effectlively 1200 PyC targets per ChC in column)
 of input space near it with 1-7 synapses per ChC.  Each PyC receives input from
 at least 4 ChC.  So if 55x55 = 3025 PyC then appx. 3025x4 = 12100 ChC
@@ -317,6 +346,10 @@ connections.  12100/1200 = ~10 ChC for small column.'''
 test_ChC = ChC(test_shape)
 ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
 
+print(test_ChC.PyC_points)
+
+test_ChC.sort_ChC()
+test_ChC.sort_PyC()
 
 pprint(ChC_dict)
 
