@@ -221,24 +221,15 @@ class ChC:
             attached_chcs.append({new_connection: 1})
             FLAG_NEW_CONNECTION = True
         else:
-            print('inc', inc)
             unchecked_chcs = [x for i,x in enumerate(attached_chcs)
                               if i!=chc_index and
                               0 <= list(x.values())[0]+inc < self.MAX_CHC_WEIGHT]
-            print('attached_chcs', attached_chcs)
-            print('unchecked_chcs', unchecked_chcs)
             chc = random.choice(unchecked_chcs)
             chc_pt = list(chc.keys())[0]
             chc[chc_pt] += inc
-        # update both dictionaries
-        self.PyC[PyC_point] = attached_chcs
-        attached_pycs = self.ChCs[chc_pt]
-        for attached_pyc in attached_pycs:
-            if list(attached_pyc.keys())[0] == [PyC_point]:
-                attached_pyc = {PyC_point: chc[chc_pt]}
-        if FLAG_NEW_CONNECTION:
-            attached_pycs.append({PyC_point: 1})
-        self.ChCs.update({chc_pt: attached_pycs})
+
+        self.update_PyC_and_ChCs_dicts(PyC_point, attached_chcs, chc_pt, chc,
+                                       FLAG_NEW_CONNECTION)
 
         current_tot_wght = current_tot_wght+inc
         new_change = current_tot_wght-target_tot_wght
@@ -291,6 +282,27 @@ class ChC:
 
         return inc, chc_index
 
+    def update_PyC_and_ChCs_dicts(self, PyC_point, attached_chcs, chc_pt, chc,
+                                  FLAG_NEW_CONNECTION):
+        '''Inputs: PyC_point is a tuple representing the pyramidal cell column
+        location in the input space,
+        attached_chcs is a list of dictionaries containing the connected
+        chandelier cells as keys and weights as the values,
+        chc_pt is a tuple representing the chandelier cell coordinates.
+        chc is the corresponding dictionary containing chandelier cell as key
+        and weight as value.
+        FLAG_NEW_CONNECTION is a boolean.
+        This function updates both mappings from pyramidal cell input space to
+        chandelier cells and chandelier cells to the input space along with the
+        shared weight value.'''
+        self.PyC[PyC_point] = attached_chcs
+        attached_pycs = self.ChCs[chc_pt]
+        for attached_pyc in attached_pycs:
+            if list(attached_pyc.keys())[0] == PyC_point:
+                attached_pyc.update({PyC_point: chc[chc_pt]})
+        if FLAG_NEW_CONNECTION:
+            attached_pycs.append({PyC_point: 1})
+        self.ChCs.update({chc_pt: attached_pycs})
 
     def check_ChCs(self):
         pass
@@ -346,7 +358,6 @@ connections.  12100/1200 = ~10 ChC for small column.'''
 test_ChC = ChC(test_shape)
 ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
 
-print(test_ChC.PyC_points)
 
 test_ChC.sort_ChC()
 test_ChC.sort_PyC()
