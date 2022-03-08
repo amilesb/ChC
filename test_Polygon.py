@@ -1,4 +1,4 @@
-''' Unit tests for ChC package. '''
+''' Unit tests for Polygon module in ChC package. '''
 # see calcresource.com/geom-pentagon.html for general polygon formula
 
 import unittest
@@ -40,7 +40,7 @@ class TestPoly(unittest.TestCase):
         self.noise = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
                                         y = 5, width=8, height=6, angle = 0)
 
-
+###################### VISUALIZATION ###########################
     def test_insert_Polygon(self):
         for shape in Polygons:
             x = getattr(self, shape)

@@ -8,17 +8,7 @@ from Polygon import Polygon
 
 from PIL import Image
 from skimage.draw import polygon_perimeter
-from scipy.ndimage.filters import gaussian_filter
 
-test_shape = Polygon(array_size=10, form='rectangle', x=5, y=5, width=4,
-                    height=3, angle = 0)
-test_shape.insert_Polygon()
-
-
-# test_shape = Polygon(array_size=256, form='rectangle', x=125, y=125, width=40,
-#                     height=30, angle = 0)
-# test_shape.insert_Polygon()
-# test_shape.display_Polygon(test_shape.input_array, angle=test_shape.angle)
 
 class ChC:
     '''create a chandelier cell dictionary which records which chandelier cells
@@ -48,7 +38,6 @@ class ChC:
         with any miscellaneous extra selected randomly.'''
 
         self.ChC_Coordinates, self.PyC_points = self.create_Coords()
-        rng = default_rng()
 
         # build base chandelier cell map to input space
         for center in self.ChC_Coordinates:
@@ -56,11 +45,11 @@ class ChC:
             board = np.zeros((self.HT, self.WD), dtype=bool)
             N_points = min(round(board.size * percent_connected/100), 1200)
                        # 1200 is appx biological chc_connection value for ChC
-            dist_char = 35 # distance where probability decays to 1/e
+            dist_char = board.size*0.35 # distance where probability decays to 1/e
             flat_board = board.ravel()
             endpoints = []
             while N_points:
-                idx = rng.integers(flat_board.size)
+                idx = default_rng().integers(flat_board.size)
                 while flat_board[idx]:
                     idx += 1
                     if idx >= flat_board.size:
@@ -70,29 +59,14 @@ class ChC:
                     point = np.array(pt_coords) # to enable distance calculation
                     dist = np.sqrt(np.sum((center-point)**2))
                     P = np.exp(-dist/dist_char)
-                    if rng.random() < P:
+                    if P > default_rng().random():
                         flat_board[idx] = True
                         synapse_wght = np.random.randint(0,self.MAX_CHC_WEIGHT)
                         endpoints.append({pt_coords: synapse_wght})
                         N_points -= 1
             self.ChCs[center] = endpoints
-
+        print('made it')
         self.build_Reciprocal_Map_Of_Input_To_ChC()
-
-        if debug:
-            print ('self.ChC_Coordinates', self.ChC_Coordinates)
-            print('array size:',self.array_size)
-            print('ChC number:',numberChC)
-            print('height:',self.HT)
-            print('width:', self.WD)
-            print('Split:',SPLIT)
-            print('REMAINING_ChC:',REMAINING_ChC)
-            print('PyC points:', self.PyC_points)
-
-            plt.figure()
-            for ep in endpoints:
-                plt.plot(*zip(center, ep), c = "red")
-            plt.show()
 
         return self.ChCs, self.PyC
 
@@ -101,10 +75,10 @@ class ChC:
         input space to attached chandelier cells.'''
         for point in self.PyC_points:
             attached_chcs = []
+            chc_points_in_use = set()
             # Generate initial reciprocal mapping of input to ChCs
             for chc_point,connected_points in self.ChCs.items():
                 for attached_point in connected_points:
-                    chc_points_in_use = set()
                     if point in attached_point.keys():
                         synapse_wght = list(attached_point.values())[0]
                         attached_chcs.append({chc_point: synapse_wght})
@@ -113,8 +87,7 @@ class ChC:
             self.check_PyC_Connection(attached_chcs, point, chc_points_in_use)
 
             total_synapse_wght = self.total_Synapse_Weight(point)
-            print('point:', point, 'total_synapse_wght:', total_synapse_wght)
-            if total_synapse_wght > 30:#self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
+            if total_synapse_wght > self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
                 self.change_Synapse_Weight(connection=(point, attached_chcs))
 
 
@@ -137,17 +110,12 @@ class ChC:
             # dict_keys is unhashable type: solution is to convert to list
             # and simply use first element.
             pt = [point]
-            print('point:', point)
             max_connected = self.find_Max_Connected_ChC(attached_chcs)
             attached_chcs = [i for i in attached_chcs if not
                              list(i.keys()) == max_connected]
-            print('new length of attached_chcs:', len(attached_chcs))
-            print('attached_chcs:', attached_chcs)
             pyc_list = self.ChCs[max_connected[0]]
             new_pyc = [i for i in pyc_list if not list(i.keys()) == pt]
-            print('length chc dict before:', len(self.ChCs[max_connected[0]]))
             self.ChCs.update({max_connected[0]: new_pyc})
-            print('length chc dict after:', len(self.ChCs[max_connected[0]]))
             stopper += 1
         self.PyC[point] = attached_chcs
 
@@ -163,14 +131,10 @@ class ChC:
         their corresponding weights and returns the one with the most
         connections to the input space.'''
         max_connected = list(attached_chcs[0].keys())
-        print('length attached chcs:', len(attached_chcs))
-        print('attached_chcs:', attached_chcs)
         for chc in attached_chcs:
             chc_point = list(chc.keys())
-            print('chc_point:',chc_point)
             if len(self.ChCs[chc_point[0]]) > len(self.ChCs[max_connected[0]]):
                 max_connected = chc_point
-            print('max_connected:', max_connected)
         return max_connected
 
 
@@ -178,7 +142,7 @@ class ChC:
         '''Takes a list of attached chandelier cells as tuples (without their
         corresponding weights) and returns the one with the least connections to
         the input space.'''
-        print('least connected function attached chcs', attached_chcs)
+        # print('least connected function attached chcs', attached_chcs)
         least_connected = attached_chcs[0]
         for chc_pt in attached_chcs:
             if len(self.ChCs[chc_pt]) < len(self.ChCs[least_connected]):
@@ -205,10 +169,8 @@ class ChC:
         else:
             target_tot_wght = current_tot_wght+change
             target_tot_wght = self.check_Weight_Change(target_tot_wght)
-
         inc, chc_index = self.select_Chand(target_tot_wght, current_tot_wght,
                                            attached_chcs)
-
         chc = attached_chcs[chc_index[0]]
         chc_pt = list(chc.keys())[0]
 
@@ -220,6 +182,8 @@ class ChC:
             new_connection = self.find_Least_Connected_ChC(list(free_chcs))
             attached_chcs.append({new_connection: 1})
             FLAG_NEW_CONNECTION = True
+        elif inc==-1 and current_tot_wght == 0:
+            return
         else:
             unchecked_chcs = [x for i,x in enumerate(attached_chcs)
                               if i!=chc_index and
@@ -253,16 +217,15 @@ class ChC:
 
     def select_Chand(self, target_tot_wght, current_tot_wght, attached_chcs):
         '''Creates a weighted list of chandelier cell indexes from the
-        attached_chcs to randomly choose from to adjust weight on.  Function
-        returns chandelier cell index as a list with 1 element and the increment
-        to adjust (either +1 or -1).'''
+        attached_chcs provided as a list of dictionaries with (chand_cell: weight)
+        to randomly choose from to adjust weight on.  Function returns chandelier
+        cell index as a list with 1 element and the increment to adjust
+        (either +1 or -1).'''
         chc_lengths = []
         for attached in attached_chcs:
             chc = list(attached.keys())
             chc_lengths.append(len(chc[0]))
         index = list(range(len(chc_lengths)))
-        print('target_tot_wght', target_tot_wght)
-        print('current_tot_wght', current_tot_wght)
 
         if target_tot_wght<current_tot_wght:
             inc = -1
@@ -304,10 +267,6 @@ class ChC:
             attached_pycs.append({PyC_point: 1})
         self.ChCs.update({chc_pt: attached_pycs})
 
-    def check_ChCs(self):
-        pass
-        # while chc_connect_more60%inputspace: disconnect ChC update PyC
-        # while chc connect < 20% : connect ChC update PyC
 
     def create_Coords(self):
         '''Generate a set of coordinates for each chandelier cell along with a
@@ -349,22 +308,36 @@ class ChC:
             connected_chcs = self.PyC[pyc_pt]
             connected_chcs.sort(key=lambda x: list(x.keys())[0])
 
+
 ''''each ChC connects to ~40% (effectlively 1200 PyC targets per ChC in column)
 of input space near it with 1-7 synapses per ChC.  Each PyC receives input from
 at least 4 ChC.  So if 55x55 = 3025 PyC then appx. 3025x4 = 12100 ChC
 connections.  12100/1200 = ~10 ChC for small column.'''
 
 
-test_ChC = ChC(test_shape)
-ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
+if __name__ == '__main__':
+
+    test_shape = Polygon(array_size=10, form='rectangle', x=5, y=5, width=4,
+                        height=3, angle = 0)
+    test_shape.insert_Polygon()
+    #
+    #
+    # # test_shape = Polygon(array_size=256, form='rectangle', x=125, y=125, width=40,
+    # #                     height=30, angle = 0)
+    # # test_shape.insert_Polygon()
+    # # test_shape.display_Polygon(test_shape.input_array, angle=test_shape.angle)
 
 
-test_ChC.sort_ChC()
-test_ChC.sort_PyC()
+    test_ChC = ChC(test_shape)
+    ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
 
-pprint(ChC_dict)
 
-pprint(pyc_dict)
+    test_ChC.sort_ChC()
+    test_ChC.sort_PyC()
 
-synapse_sum = test_ChC.total_Synapse_Weight((9,9))
-pprint(synapse_sum)
+    # pprint(ChC_dict)
+    #
+    # pprint(pyc_dict)
+
+    synapse_sum = test_ChC.total_Synapse_Weight((9,9))
+    # pprint(synapse_sum)
