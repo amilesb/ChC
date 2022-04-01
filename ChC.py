@@ -65,7 +65,6 @@ class ChC:
                         endpoints.append({pt_coords: synapse_wght})
                         N_points -= 1
             self.ChCs[center] = endpoints
-        print('made it')
         self.build_Reciprocal_Map_Of_Input_To_ChC()
 
         return self.ChCs, self.PyC
@@ -121,8 +120,8 @@ class ChC:
 
 
     def total_Synapse_Weight(self, PyC_array_element):
-        '''Takes a point in the PyC input space and returns the total synapse
-        weight attached to it.'''
+        '''Takes a point in the PyC input space at a tuple and returns the total
+        synapse weight attached to it.'''
         return sum([list(chc.values())[0] for chc in self.PyC[PyC_array_element]])
 
 

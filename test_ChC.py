@@ -319,7 +319,7 @@ class TestChC(unittest.TestCase):
     ############### INTEGRATION TEST ########################
 
     def test_Large_ChC(self):
-        print('starting big')
+        print('Takes about 25 mins to run for 256x256 input space')
         ChCs_dict, PyC_dict = self.large_ChC.attach_ChC_Coords()
         self.large_ChC.sort_ChC()
         self.large_ChC.sort_PyC()
