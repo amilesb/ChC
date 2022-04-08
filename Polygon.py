@@ -26,6 +26,7 @@ class Polygon:
         self.y = y
         self.angle = angle
         self.form = form
+        self.MAX_INPUT = 255
 
     def create_Simple_Polygon(self, form):
         ''' Returns the coordinates of the vertex points for a polygon of
@@ -96,7 +97,7 @@ class Polygon:
         # polygon_perimeter is an imported library function
         rr, cc = polygon_perimeter(rr, cc, shape=self.input_array.shape,
                                    clip=False)
-        self.input_array[rr, cc] = 255
+        self.input_array[rr, cc] = self.MAX_INPUT
         if display:
             self.display_Polygon(self.input_array, angle=self.angle,
                                  form=self.form, polygon=transformed_poly)
@@ -138,13 +139,13 @@ class Polygon:
         if not start:
             start = 0
         if not stop:
-            stop = 255//2
+            stop = self.MAX_INPUT//2
         if is_horizontal:
             gradient = np.tile(np.linspace(start, stop, width), (height, 1))
         else:
             gradient = np.tile(np.linspace(start, stop, height), (width, 1)).T
         self.input_array += gradient
-        self.input_array = np.clip(self.input_array, 0, 255)
+        self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
 
         return self.input_array
 
@@ -154,7 +155,7 @@ class Polygon:
         # np.random.seed(5) # for testing
         noise = np.random.normal(0, scale, (self.input_array.shape))
         self.input_array += noise
-        self.input_array = np.clip(self.input_array, 0, 255)
+        self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
         # self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
         return self.input_array

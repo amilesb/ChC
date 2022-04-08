@@ -26,7 +26,6 @@ class Encoder:
         self.n = 400 # number of bits
         self.buckets = self.n+1-self.w
         self.valInput = int("".join(str(x) for x in self.flat_input), 2)
-        # self.index = floor(self.buckets*(self.val-self.MINVAL)/self.RANGE)
 
         coordinates = []
         for x in range(input_piece.shape[0]):

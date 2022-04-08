@@ -42,39 +42,51 @@ REC_FLD_LENGTH = 4
 stride = np.ceil(test_shape.shape[0]/REC_FLD_LENGTH) # 256/4 = 32
 num_receptive_fields = stride**2 # 1024
 
-start = (0,0)
+max_gray = test_shape.MAX_INPUT # 255
+max_tot_chc_wght = test_ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT # 40
+
+def calculate_Threshold_Filter(max_gray, max_tot_chc_wght):
+    '''Inputs are scalar values representing the maximum grascale pixel
+    intensity and the maximum total chandelier cell combined weight at an
+    active point in the input space.  Function returns a scalar filter value
+    that is used to apply a threshold to the an arbitrary value in the input
+    space.'''
+    return max_gray/max_tot_chc_wght
+
+corner_start = (test_shape.shape[0]//2, test_shape.shape[1]//2)
+filter = calculate_Threshold_Filter(max_gray, max_tot_chc_wght)
 
 
-
-receptive_fields = []
-for i in range(receptive_fields_per_length):
-    for j in range(receptive_fields_per_length):
-        field = [x, y for ]
-        threshold = test_ChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
-        receptive_field =
-
-def apply_Receptive_Field(length=REC_FLD_LENGTH, start):
-    '''start is point in the input space designating upper left corner of the
+def apply_Receptive_Field(length=REC_FLD_LENGTH, corner_start=corner_start,
+                          threshold=threshold):
+    '''corner_start is point in the input space designating upper left corner of the
     receptive field.  Receptive field length represents the size of the
     receptive field.  Function returns an array of the same size as the
     receptive field filtered by the threshold set from the connected chandelier
     cell weights.'''
 
     # check if receptive field falls off input space and backup if so
-    if start[0] > test_shape.shape[0]-length:
+    if corner_start[0] > test_shape.shape[0]-length:
         start_x = test_shape.shape[0]-length
     else:
-        start_x = start[0]
-    if start[1] > test_shape.shape[1]-length:
+        start_x = corner_start[0]
+    if corner_start[1] > test_shape.shape[1]-length:
         start_y = test_shape.shape[0]-length
     else:
-        start_y = start[1]
+        start_y = corner_start[1]
 
+    rec_fld_filter = np.zeros([length, length])
     for i in range(start_x, start_x+REC_FLD_LENGTH):
         for j in range(start_y, start_y+REC_FLD_LENGTH):
-            threshold = test_ChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
+            weight = test_ChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
+            result = max(test_shape[(i,j)] - filter*weight, 0)
+            if result > threshold:
+                rec_fld_filter[(i,j)] = result
+    encoding = Encoder(rec_fld_filter).build_Encoding()
 
-            # pull out threshold and apply to input
+# build SDR from encoding!
+
+
 
 
 
