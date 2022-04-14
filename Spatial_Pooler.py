@@ -4,9 +4,6 @@ from numpy.random import default_rng
 from Encoder import Encoder
 
 
-
-
-
 class Spatial_Pooler:
 
     def __repr__(self):
@@ -223,22 +220,3 @@ class Spatial_Pooler:
         counts_avg = meanOVERLAP_DC*100
 
         return (counts_avg - (2*np.sqrt(counts_avg)) ) / 100
-
-
-
-
-if __name__ == '__main__':
-    pass
-
-    # sp = Spatial_Pooler(1200)
-    # print(sp.synapses[0])
-
-
-
-
-
-# synapse == data structure represing permanence value and source input index
-
-
-# potentialSynapses = []  list of potential synapses and their permanence
-# connectedSynapses = []  subset of potentialSynapses where perm is greater than connectedPerm

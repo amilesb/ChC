@@ -324,10 +324,44 @@ class TestChC(unittest.TestCase):
         self.large_ChC.sort_ChC()
         self.large_ChC.sort_PyC()
 
-        # chand_dict = self.build_ChC_Dict_From_PyC(self.PyC)
-        #
-        # assert self.ChCs == chand_dict
+        chand_dict = self.build_ChC_Dict_From_PyC(self.PyC)
+
+        assert self.ChCs == chand_dict
 
 
 if __name__ == '__main__':
     unittest.main()
+
+
+'''NOTES'''
+
+'''each ChC connects to ~40% (effectlively 1200 PyC targets per ChC in column)
+of input space near it with 1-7 synapses per ChC.  Each PyC receives input from
+at least 4 ChC.  So if 55x55 = 3025 PyC then appx. 3025x4 = 12100 ChC
+connections.  12100/1200 = ~10 ChC for small column.'''
+
+########### Common calls for quick reference ##########
+# test_shape = Polygon(array_size=10, form='rectangle', x=5, y=5, width=4,
+#                     height=3, angle = 0)
+# test_shape.insert_Polygon()
+# #
+# #
+# # # test_shape = Polygon(array_size=256, form='rectangle', x=125, y=125, width=40,
+# # #                     height=30, angle = 0)
+# # # test_shape.insert_Polygon()
+# # # test_shape.display_Polygon(test_shape.input_array, angle=test_shape.angle)
+#
+#
+# test_ChC = ChC(test_shape)
+# ChC_dict, pyc_dict = test_ChC.attach_ChC_Coords(debug=False)
+#
+#
+# test_ChC.sort_ChC()
+# test_ChC.sort_PyC()
+#
+# # pprint(ChC_dict)
+# #
+# # pprint(pyc_dict)
+#
+# synapse_sum = test_ChC.total_Synapse_Weight((9,9))
+# pprint(synapse_sum)

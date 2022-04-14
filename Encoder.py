@@ -82,7 +82,3 @@ class Encoder:
         index = int(np.floor(self.buckets*(VALUE-min)/range))
 
         return index
-
-
-if __name__ == '__main__':
-    pass
