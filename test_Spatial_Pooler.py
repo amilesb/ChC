@@ -198,6 +198,14 @@ class TestEncoder(unittest.TestCase):
 
         assert minOverlapDC == poisson50
 
+    def testVisualizeSP(self):
+        c = 0
+        timestamp = 0
+        currentInput = np.random.randint(0,2,1200)
+        overlapScore = self.sp.computeOverlap(currentInput)
+        winningColumnsInd = self.sp.computeWinningCOlumns(overlapScore)
+        self.sp.visualizeSP(c, currentInput, winningColumnsInd, timestamp)
+
 
 if __name__ == '__main__':
     unittest.main()

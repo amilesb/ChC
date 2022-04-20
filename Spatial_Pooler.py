@@ -1,10 +1,17 @@
 import numpy as np
 from numpy.random import default_rng
+import matplotlib as mpl
+from matplotlib import pyplot
+import matplotlib.patches as mpatches
 
 from Encoder import Encoder
 
 
 class Spatial_Pooler:
+    '''The main function interface for this class is the computeWinningCOlumns
+    function which determines the active mini-columns.  Additionally,
+    updateSynapseParameters enables learning in the spatial pooler and should be
+    used in tandem.'''
 
     def __repr__(self):
         return (f'''This class implements the spatial pooling algorithm as
@@ -15,6 +22,7 @@ class Spatial_Pooler:
                 input.  Through learning, the spatial pooler adjusts its
                 permanence values as well as redistributes its connectivity
                 wiring to better match the statistics of the input.''')
+
 
     def __init__(self, lengthEncoding):
         '''Num mini-columns = 2048, 40 is roughly 2% of 2048, the percent of
@@ -61,10 +69,10 @@ class Spatial_Pooler:
     def computeOverlap(self, currentInput):
         '''Current input represents a binary encoding (array) that is obtained
         from applying a threshold over the input space.  This function takes
-        each mini-column and returns a list with the scalar overlap score based
-        on each mini-columns connectivity to the ON bits in the input.  Note,
-        the index position of the overlapScore list is matched to the index
-        identifying each mini-column.'''
+        each mini-column and returns a list (weighted by the boost factor) with
+        the scalar overlap score based on each mini-columns connectivity to the
+        ON bits in the input.  Note, the index position of the overlapScore list
+        is matched to the index identifying each mini-column.'''
 
         overlapScore = []
 
@@ -106,7 +114,7 @@ class Spatial_Pooler:
 
     def updateSynapseParameters(self, winningColumnsInd, overlapScore, currentInput):
         '''Inputs a list of winning mini-column indices along with the current
-        input as a binary array and updates the permancence values for the
+        input as a binary array and updates the permanence values for the
         winning mini-columns only.  In the second loop, homeostatic boosting is
         implemented by reviewing how active a mini-column is relative to its
         neighbors and boosting up or down to normalize all mini-columns towards
@@ -123,7 +131,7 @@ class Spatial_Pooler:
         stamp and all minicolumns with index greater from time-stamp minus 1.
         This translates to each minicolumn seeing a slightly different mean
         active duty cycle.  However, as the duty cycle represents a running
-        average of previous 1000 timestamps, this slight difference is
+        average of previous 1000 timestamp, this slight difference is
         negligible and an implementation detail only.'''
 
         for c in winningColumnsInd:
@@ -220,3 +228,77 @@ class Spatial_Pooler:
         counts_avg = meanOVERLAP_DC*100
 
         return (counts_avg - (2*np.sqrt(counts_avg)) ) / 100
+
+    def visualizeSP(self, c, currentInput, winningColumnsInd, timestamp):
+        '''Function designed to show properties of the input space and spatial
+        pooler and the connections between them.  Helpful for visual
+        understanding and debugging.'''
+
+        # Note overlapScore includes boost factor for mini-column
+        overlapScore = self.computeOverlap(currentInput)
+
+        # Generate data to plot
+
+        currentInput = np.reshape(currentInput, (30,40))
+
+        connectedSynapses = self.computeConnectedSynapses(self.synapses[c])
+        potentialSynapses = self.synapses[c]['index']
+        mcOverlap = np.zeros(self.lengthEncoding)
+        for i in range(self.lengthEncoding):
+            if i in potentialSynapses:
+                mcOverlap[i] = 1
+            if i in connectedSynapses:
+                mcOverlap[i] = 2
+        mcOverlap = np.reshape(mcOverlap, (30, 40))
+
+        minicols = np.zeros(self.columnCount)
+        for i in range(self.columnCount):
+            if i in winningColumnsInd:
+                minicols[i] = 1
+        minicols = np.reshape(minicols, (32,64))
+
+        # set up figure
+        fig = pyplot.figure()
+        subfigs = fig.subfigures(1,1)
+
+        subfigs.suptitle(f'mc {c} at Timestamp {timestamp}')
+        ax = subfigs.subplots(1,3)
+        ax[0].title.set_text('Current Input')
+        ax[1].title.set_text(f'mc {c} Overlap')
+        ax[2].title.set_text('SP Winning Columns')
+
+
+        cmap = mpl.colors.ListedColormap(['black', 'blue', 'red'])
+        cmapInput = mpl.colors.ListedColormap(['black', 'red'])
+        img0 = ax[0].imshow(currentInput, cmap=cmapInput)
+        img1 = ax[1].imshow(mcOverlap, cmap = cmap)
+        img2= ax[2].imshow(minicols, cmap = cmap)
+
+
+        labels0 = ['Off bit', 'On bit']
+        labels1 = ['No Connection Possible', 'Potential Synapse', 'Connected Synapse']
+        labels2 = ['Not selected', 'Winning Column']
+        patches0 = [mpatches.Patch(color=cmapInput.colors[i], label=labels0[i])
+                   for i in range(len(labels0))]
+        ax[0].legend(handles=patches0, loc='lower center',bbox_to_anchor=(0.2,0),
+                     bbox_transform=fig.transFigure)
+
+        patches1 = [mpatches.Patch(color=cmap.colors[i], label=labels1[i])
+                   for i in range(len(labels1))]
+        ax[1].legend(handles=patches1, loc='lower center',bbox_to_anchor=(0.5,0),
+                     bbox_transform=fig.transFigure)
+
+        patches2 = [mpatches.Patch(color=cmapInput.colors[i], label=labels2[i])
+                   for i in range(len(labels2))]
+        ax[2].legend(handles=patches2, loc='lower center',bbox_to_anchor=(0.8,0),
+                     bbox_transform=fig.transFigure)
+        pyplot.show()
+
+
+
+                # for row, subfig in enumerate([subfigs]):
+                #     subfig.suptitle(f'mc {c} at Timestamp {row}')
+                #     ax = subfig.subplots(1,3)
+                #     ax[0].title.set_text('Current Input')
+                #     ax[1].title.set_text(f'mc {c} Overlap')
+                #     ax[2].title.set_text('SP Winning Columns')
