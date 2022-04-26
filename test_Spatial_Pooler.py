@@ -198,6 +198,8 @@ class TestEncoder(unittest.TestCase):
 
         assert minOverlapDC == poisson50
 
+
+#### Visualization/Integration test #####
     def testVisualizeSP(self):
         c = 0
         timestamp = 0
