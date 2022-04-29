@@ -4,7 +4,6 @@ from numpy.random import default_rng
 from Spatial_Pooler import Spatial_Pooler
 from Encoder import Encoder
 
-
 class SequenceMemory:
 
     def __repr__(self):
@@ -49,7 +48,31 @@ class SequenceMemory:
 
         self.totalCells = self.columnCount*self.cellsPerColumn # default is 65536
 
-        self.synapses = {'upstreamCellIdx': None, 'permanence': None}
+        # self.synapses = {}
+        # for i in range(self.columnCount * self.cellsPerColumn *
+        #                self.maxSegmentsPerCell * self.maxSynapsePerSegment):
+        #     self.synapses[i] = {'upstreamCellIdx': None, 'permanence': None}
+        ####### THIS CODE IS TOO BIG  NEED to use out of core processing perhaps mongoDB?!?
+
+
+
+        # ''' There are an extraordinary number of synapses
+        # ~2048col*32cells/col*255segs/cell*255syns/seg = 4261478400 synapses.
+        # This amount is too large for a dictionary so using numpy array to speed
+        # up.  Note, each synapse consists of 3 parameters: an upstream cell, a
+        # downstream cell, and a permanence (or connection strength).  In this
+        # implementation, the downstream cell identity is implied by the index
+        # into 2 numpy arrays while the other 2 parameters are the corresponding
+        # value in each of the respective arrays.  Each initialized to -1 as this
+        # represents a null value.'''
+
+        init = np.ones((self.columnCount * self.cellsPerColumn *
+                       self.maxSegmentsPerCell * self.maxSynapsePerSegment),
+                       dtype = np.int8)
+        init = init*(-1)
+
+        self.upstreamCellIdx = init
+        self.synapsePerm = init.copy()
 
     def processInputThroughSP(self, currentInput):
         '''Starting interface for SequenceMemory.  Takes a spatial pooler

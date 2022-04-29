@@ -10,7 +10,7 @@ from Encoder import Encoder
 from Spatial_Pooler import Spatial_Pooler
 
 
-class TestEncoder(unittest.TestCase):
+class TestSpatialPooler(unittest.TestCase):
 
     def setUp(self):
         self.lengthEncoding = 1200

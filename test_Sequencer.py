@@ -11,7 +11,7 @@ from Spatial_Pooler import Spatial_Pooler
 from Sequencer import SequenceMemory
 
 
-class TestEncoder(unittest.TestCase):
+class TestSequenceMemory(unittest.TestCase):
 
     def setUp(self):
         self.lengthEncoding = 1200
@@ -35,7 +35,7 @@ class TestEncoder(unittest.TestCase):
 
     def test_countActiveSegments(self):
         # (32 cells/column) * (255 segments/cell) = 8160 segments/column
-        self.seq.activeSegments = [0, 3, 500, 8159, 8160] # 8159 is last segment of column 1
+        self.seq.activeSegments = [0, 3, 3825, 8159, 8160] # 3825 is segment for cell 15; 8159 is last segment of column 1
 
         self.seq.countActiveSegments(c=0)
 
@@ -84,9 +84,33 @@ class TestEncoder(unittest.TestCase):
                 assert self.seq.matchingSegments == segs
 
     def test_updatePerms(self):
-        # updatePerms(idxColSegments, prevActiveCells)
-        # DO ME NEXT!!
-        pass
+
+        numActivePotentialSynapses = {}
+        initPerm = 0.3
+        idxColSegments = [i for i in range(8160)] # 8160 segments in column 1 (255*32)
+        prevActiveCells = [33, 65, 70, 1000] # pseudo random list of previous active cells
+        s = 0
+        for segmentIdx in idxColSegments:
+            if s > 254:
+                s = 0
+            numActivePotentialSynapses[segmentIdx] = s
+            s += 1
+            idxCellSynapses = self.seq.indexHelper('segment', segmentIdx)
+            for synapse in idxCellSynapses:
+                self.seq.synapses[synapse]['permanence'] = initPerm
+
+
+        for idx in range(4):
+            self.seq.synapses[idx]['upstreamCellIdx'] = prevActiveCells[idx]
+
+
+        self.seq.updatePerms(idxColSegments, prevActiveCells, numActivePotentialSynapses)
+        for idx in range(2080800): # 2080800 synapses in column 1
+            if idx < 4:
+                assert self.seq.synapses[idx]['permanence'] == initPerm+self.seq.permIncrement
+            else:
+                assert self.seq.synapses[idx]['permanence'] == initPerm-self.seq.permDecrement
+
 
     def test_growSynapses(self):
         # growSynapses(self, segmentIdx, newSynapseCount):
