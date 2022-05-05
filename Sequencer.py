@@ -1,5 +1,7 @@
 import numpy as np
 from numpy.random import default_rng
+from collections import defaultdict
+import random
 
 from Spatial_Pooler import Spatial_Pooler
 from Encoder import Encoder
@@ -29,50 +31,47 @@ class SequenceMemory:
         # it.'''
         self.sp = spatialPooler
         self.columnCount = self.sp.columnCount # default is 2048
-        self.cellsPerColumn = 32
+        self.cellsPerColumn = 8
 
         self.activationThreshold = 13
-        self.initialPerm = 0.21
+        self.initialPerm = 0.2
         self.connectedPerm = 0.5
-        self.minThreshold = 10
+        self.minThreshold = 0
         self.maxNewSynapseCount = 20
         self.permIncrement = 0.1
         self.permDecrement = 0.1
+        self.predictedDecrement = 0.05
         self.maxSegmentsPerCell = 255
-        self.maxSynapsePerSegment = 255
+        self.maxSynapsePerSegment = 63
 
-        self.activeCells = [] # Note the purpose of this list is to get remade at each iteration
+        self.activeCells = []
         self.winnerCells = []
         self.activeSegments = []
         self.matchingSegments = []
+        self.numActivePotentialSynapses = defaultdict(int)
+        self.segmentsInUse = {}
 
-        self.totalCells = self.columnCount*self.cellsPerColumn # default is 65536
-
-        # self.synapses = {}
-        # for i in range(self.columnCount * self.cellsPerColumn *
-        #                self.maxSegmentsPerCell * self.maxSynapsePerSegment):
-        #     self.synapses[i] = {'upstreamCellIdx': None, 'permanence': None}
-        ####### THIS CODE IS TOO BIG  NEED to use out of core processing perhaps mongoDB?!?
+        self.totalCells = self.columnCount*self.cellsPerColumn
 
 
-
-        # ''' There are an extraordinary number of synapses
-        # ~2048col*32cells/col*255segs/cell*255syns/seg = 4261478400 synapses.
+        # '''NOTE ON IMPLEMENTATION - There are an extraordinary number of synapses
+        # ~2048col*8cells/col*255segs/cell*63syns/seg.
         # This amount is too large for a dictionary so using numpy array to speed
         # up.  Note, each synapse consists of 3 parameters: an upstream cell, a
         # downstream cell, and a permanence (or connection strength).  In this
         # implementation, the downstream cell identity is implied by the index
         # into 2 numpy arrays while the other 2 parameters are the corresponding
         # value in each of the respective arrays.  Each initialized to -1 as this
-        # represents a null value.'''
+        # represents a null value.  Using such a large numpy array is cheapest
+        # with only 8 bits (dtype=int8) as a result permanence values and
+        # corresponding initial values, increments, and decrements are scaled from
+        # 0-1 to 1-10.'''
 
-        init = np.ones((self.columnCount * self.cellsPerColumn *
-                       self.maxSegmentsPerCell * self.maxSynapsePerSegment),
-                       dtype = np.int8)
-        init = init*(-1)
+        self.upstreamCellIdx = np.ones(self.totalCells*self.maxSegmentsPerCell*
+                                       self.maxSynapsePerSegment)
+        self.upstreamCellIdx = self.upstreamCellIdx*(-1)
 
-        self.upstreamCellIdx = init
-        self.synapsePerm = init.copy()
+        self.synapsePerm = self.upstreamCellIdx.copy()
 
     def processInputThroughSP(self, currentInput):
         '''Starting interface for SequenceMemory.  Takes a spatial pooler
@@ -90,20 +89,27 @@ class SequenceMemory:
 
         prevActiveCells = self.activeCells
         self.activeCells = []
+        prevWinnerCells = self.winnerCells
+        self.winnerCells = []
+        prevActiveSegments = self.activeSegments
+        self.activeSegments = []
+        prevMatchingSegments = self.matchingSegments
+        self.matchingSegments = []
+        prevNumActivePotentialSynapses = self.numActivePotentialSynapses
+        self.numActivePotentialSynapses = defaultdict(int)
 
         for c in range(self.columnCount):
             if c in winningColumnsIdx:
-                columnActiveSegments, idxColSegments = self.countActiveSegments(c)
+                numColActiveSegments, idxColSegments = self.countActiveSegments(c)
                 if columnActiveSegments > 0:
-                    numActivePotentialSynapses = self.activatePredictedCells(c, prevActiveCells)
-                    self.updatePerms(idxColSegments, prevActiveCells,
-                                     numActivePotentialSynapses)
+                    self.numActivePotentialSynapses = self.activatePredictedCells(c, prevActiveCells)
+                    self.updatePerms(idxColSegments, prevActiveCells)
                 else:
                     self.burstColumn(c)
             else:
-                columnActiveSegments = self.countActiveSegments(c)
+                numColumnMatchingSegments, idxColSegments = self.countMatchingSegments(c)
                 if columnActiveSegments > 0:
-                    self.punishPredictedColumn(c)
+                    self.punishPredictedColumn(c, idxColSegments)
 
 
     def countActiveSegments(self, c):
@@ -112,17 +118,36 @@ class SequenceMemory:
         the column.'''
 
         idxColSegments = []
+        columnActiveSegments = []
 
         idxColCells = self.indexHelper('column', c)
         for cellIdx in idxColCells:
             idxCellSegments = self.indexHelper('cell', cellIdx)
-            columnActiveSegments = set(idxCellSegments) & set(self.activeSegments) # note here activeSegments refers to previous iteration
-            if columnActiveSegments:
+            cellActiveSegments = set(idxCellSegments) & set(self.activeSegments) # here activeSegments refers to previous iteration
+            columnActiveSegments.extend(cellActiveSegments)
+            if cellActiveSegments:
                 self.activeCells.append(cellIdx)
                 self.winnerCells.append(cellIdx)
             idxColSegments.extend(idxCellSegments)
 
         return len(columnActiveSegments), idxColSegments
+
+    def countMatchingSegments(self, c):
+        '''Input a column index, c, and return the number of matching segments
+        along with a list of indices for the dendritic segments for all cells in
+        the column.'''
+
+        idxColSegments = []
+        columnMatchingSegments = []
+
+        idxColCells = self.indexHelper('column', c)
+        for cellIdx in idxColCells:
+            idxCellSegments = self.indexHelper('cell', cellIdx)
+            cellMatchingSegments = set(idxCellSegments) & set(self.matchingSegments)
+            columnMatchingSegments.extend(cellMatchingSegments)
+            idxColSegments.extend(idxCellSegments)
+
+        return len(columnMatchingSegments), idxColSegments
 
     def activatePredictedCells(self, c, prevActiveCells): # maybe this is activate segments?
         '''Input a column index, c, and activate any cells that were in a
@@ -133,8 +158,6 @@ class SequenceMemory:
         synapses for each segment (to determine how many new connections to
         grow).'''
 
-        numActivePotentialSynapses = {}
-
         idxColCells = self.indexHelper('column', c)
         for cellIdx in idxColCells:
             if cellIdx in self.activeCells:
@@ -144,10 +167,10 @@ class SequenceMemory:
                     numActiveConnected = 0
                     numActivePotential = 0
                     for synapseIdx in idxCellSynapses:
-                        if self.synapses[synapseIdx]['upstreamCellIdx'] in prevActiveCells:
-                            if self.synapses[synapseIdx]['permanence'] > self.connectedPerm:
+                        if self.upstreamCellIdx[synapseIdx] in prevActiveCells:
+                            if self.synapsePerm[synapseIdx] > self.connectedPerm:
                                 numActiveConnected += 1
-                            if self.synapses[synapseIdx]['permanence'] >= 0:
+                            if self.synapsePerm[synapseIdx] >= 0:
                                 numActivePotential += 1
 
                     if numActiveConnected>self.activationThreshold:
@@ -156,33 +179,31 @@ class SequenceMemory:
                     if numActivePotential>self.minThreshold:
                         self.matchingSegments.append(segmentIdx)
 
-                    numActivePotentialSynapses[segmentIdx] = numActivePotential
+                    self.numActivePotentialSynapses[segmentIdx] = numActivePotential
 
-        return numActivePotentialSynapses
+        return self.numActivePotentialSynapses
 
-    def updatePerms(idxColSegments, prevActiveCells, numActivePotentialSynapses):
+    def updatePerms(self, idxColSegments, prevActiveCells):
         '''Input a list of dendritic segments for all cells in a column, a list
-        of the active cells from the previous timestamp, and a dictionary
-        consisting of segment index as the key and number of potential synapses
-        (i.e. association with an upstream cell aka perm>=0) as the value.  This
-        function cycles through each segment's synapses to update the permanence
-        value based on whether or not the upstream cell associated with that
-        synapse was active during the previous iteration.
-        It then computes the number of new synapses to add for each segment, if
-        any and grows connections to new upstream cells.'''
+        of the active cells from the previous timestamp.  This function cycles
+        through each segment's synapses to update the permanence value based on
+        whether or not the upstream cell associated with that synapse was active
+        during the previous iteration. It then computes the number of new
+        synapses to add for each segment, if any and grows connections to new
+        upstream cells.'''
 
         for segmentIdx in idxColSegments:
             idxCellSynapses = self.indexHelper('segment', segmentIdx)
-            for synapse in idxCellSynapses:
-                if self.synapses[synapseIdx]['upstreamCellIdx'] in prevActiveCells:
-                    self.synapses[synapseIdx]['permanence'] += self.permIncrement
+            for synapseIdx in idxCellSynapses:
+                if self.upstreamCellIdx[synapseIdx] in prevActiveCells:
+                    self.synapsePerm[synapseIdx] += self.permIncrement
                 else:
-                    self.synapses[synapseIdx]['permanence'] += self.permDecrement
+                    self.synapsePerm[synapseIdx] -= self.permDecrement
 
             newSynapseCount = (self.maxNewSynapseCount -
-                               numActivePotentialSynapses[segmentIdx])
+                               self.numActivePotentialSynapses[segmentIdx])
 
-            self.growSynapses(self, segmentIdx, newSynapseCount)
+            self.growSynapses(segmentIdx, newSynapseCount)
 
     def indexHelper(self, type, metaIdx):
         '''Simple helper function select appropriate indices.  Inputs a type as
@@ -210,11 +231,95 @@ class SequenceMemory:
 
     def burstColumn(self, c):
         '''Activate all cells within a column.'''
-        self.activeCells.extend([c for c in range(c, c+32)])
 
-    def punishPredictedColumn(self, c):
-        pass
+        idxColSegments = []
+        for cellIdx in range(c, c+self.cellsPerColumn):
+            self.activeCells.append(cellIdx)
+            idxColSegments.extend(self.indexHelper('cell', cellIdx))
+        matchSegsInCol = set(self.matchingSegments) & set(idxColSegments)
+        if matchSegsInCol:
+            learningSegmentIdx = self.bestMatchingSegment(c, matchSegsInCol)
+            winnerCell = np.floor(learningSegmentIdx/self.maxSegmentsPerCell)
+        else:
+            winnerCell = self.leastUsedCell(c)
+            learningSegmentIdx = self.learnOnNewSegment(c, winnerCell)
 
+        self.winnerCells.append(winnerCell)
+
+        idxCellSynapses = self.indexHelper('segment', learningSegmentIdx)
+
+        for synapseIdx in idxCellSynapses:
+            if self.upstreamCellIdx[synapseIdx] in self.activeCells:
+                self.synapsePerm[synapseIdx] += self.permIncrement
+            else:
+                self.synapsePerm[synapseIdx] -= self.permDecrement
+
+        newSynapseCount = (self.maxNewSynapseCount -
+                           self.numActivePotentialSynapses[learningSegmentIdx])
+
+        self.growSynapses(learningSegmentIdx, newSynapseCount)
+
+    def bestMatchingSegment(self, c, matchSegsInCol):
+        '''Input a column index, c and a list of indices for all the matching
+        segments (i.e. segments in column with potential synapses).  Return the
+        segment index with the largest number of active potential synapsess.'''
+
+        bestMatchingSeg = None
+        bestScore = -1
+        for segmentIdx in matchSegsInCol:
+            if self.numActivePotentialSynapses[segmentIdx] > bestScore:
+                bestMatchingSeg = segmentIdx
+                bestScore = self.numActivePotentialSynapses[segmentIdx]
+
+        return bestMatchingSeg
+
+    def leastUsedCell(self, c):
+        '''Input a column index, c and return a cell index corresponding to the
+        least used cell in that column.'''
+
+        leastUsedCells = {}
+
+        idxColCells = self.indexHelper('column', c)
+        for cellIdx in idxColCells:
+            idxCellSegments = self.indexHelper('cell', cellIdx)
+            cellActiveSegments = set(idxCellSegments) & set(self.activeSegments)
+            leastUsedCells[cellIdx] = len(cellActiveSegments)
+
+        minval = min(leastUsedCells.values())
+        leastUsedCellsList = [k for k,v in leastUsedCells.items() if v == minval]
+
+        return random.choice(leastUsedCellsList)
+
+    def learnOnNewSegment(self, c, cell):
+        '''Input a column index, c, and cell index, cell.  Return segment index
+        of first available segment or -1 if none available.'''
+
+        key = (c, cell)
+        try:
+            lastUsedSeg = self.segmentsInUse[key]
+            nextSeg = lastUsedSeg+1
+            self.segmentsInUse[key] = nextSeg
+        except KeyError:
+            nextSeg = 0
+            self.segmentsInUse[key] = nextSeg
+
+        if nextSeg == self.maxSegmentsPerCell:
+            self.segmentsInUse[key] = self.maxSegmentsPerCell-1
+            nextSeg = -1
+
+        return nextSeg
+
+    def punishPredictedColumn(self, c, idxColSegments):
+        '''Input a column index, c, that contains matching segments and punish
+        the synapses that caused these false positive matches.'''
+
+        falsePositiveSegments = set(idxColSegments) & set(self.matchingSegments)
+
+        for segmentIdx in falsePositiveSegments:
+            idxCellSynapses = self.indexHelper('segment', segmentIdx)
+            for synapseIdx in idxCellSynapses:
+                if self.upstreamCellIdx[synapseIdx] in self.activeCells:
+                    self.synapsePerm[synapseIdx] -= self.predictedDecrement
 
 
 '''Combinatorally speaking, the SequenceMemory algorithm needs to encompass an
