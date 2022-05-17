@@ -68,7 +68,7 @@ class SequenceMemory:
         # 0-1 to 1-10.'''
 
         self.upstreamCellIdx = np.ones(self.totalCells*self.maxSegmentsPerCell*
-                                       self.maxSynapsePerSegment)
+                                       self.maxSynapsePerSegment, dtype=np.float32)
         self.upstreamCellIdx = self.upstreamCellIdx*(-1)
 
         self.synapsePerm = self.upstreamCellIdx.copy()
@@ -150,14 +150,15 @@ class SequenceMemory:
         self.updatePerms(colActiveSegments, prevActiveCells)
 
 
-    def updatePerms(self, idxColSegments, prevActiveCells):
+    def updatePerms(self, idxColSegments, prevActiveCells, prevWinnerCells):
         '''Input a list of dendritic segments for all cells in a column, a list
-        of the active cells from the previous timestamp.  This function cycles
-        through each segment's synapses to update the permanence value based on
-        whether or not the upstream cell associated with that synapse was active
-        during the previous iteration. It then computes the number of new
-        synapses to add for each segment, if any and grows connections to new
-        upstream cells.'''
+        of the active cells from the previous timestamp, and a list of winner
+        cells from the previous timestamp (potential pool to connect to).  This
+        function cycles through each segment's synapses to update the permanence
+        value based on whether or not the upstream cell associated with that
+        synapse was active during the previous iteration. It then computes the
+        number of new synapses to add for each segment, if any and grows
+        connections to new upstream cells.'''
 
         if isinstance(idxColSegments, int):
             idxColSegments = [idxColSegments]
@@ -175,7 +176,7 @@ class SequenceMemory:
             newSynapseCount = (self.maxNewSynapseCount -
                                self.numActivePotentialSynapses[segmentIdx])
 
-            self.growSynapses(segmentIdx, newSynapseCount)
+            self.growSynapses(segmentIdx, newSynapseCount, prevWinnerCells)
 
     def indexHelper(self, type, metaIdx):
         '''Simple helper function select appropriate indices.  Inputs a type as
@@ -199,7 +200,7 @@ class SequenceMemory:
         return idxs
 
 
-    def growSynapses(self, segmentIdx, newSynapseCount):
+    def growSynapses(self, segmentIdx, newSynapseCount, prevWinnerCells):
         pass
 
 

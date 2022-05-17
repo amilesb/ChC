@@ -55,32 +55,33 @@ class TestSequenceMemory(unittest.TestCase):
     #     assert self.seq.activeCells == [0, 1]
     #     assert self.seq.winnerCells == [0, 1]
     #
-    # def test_updatePerms(self):
-    #
-    #     self.seq.numActivePotentialSynapses = {}
-    #     initPerm = 3
-    #     idxColSegments = [i for i in range(2040)] # 2040 segments in column 1 (255*8)
-    #     prevActiveCells = [33, 65, 70, 1000] # pseudo random list of previous active cells
-    #     s = 0
-    #     for segmentIdx in idxColSegments:
-    #         if s > 254:
-    #             s = 0
-    #         self.seq.numActivePotentialSynapses[segmentIdx] = s
-    #         s += 1
-    #         idxCellSynapses = self.seq.indexHelper('segment', segmentIdx)
-    #         for synapse in idxCellSynapses:
-    #             self.seq.synapsePerm[synapse] = initPerm
-    #
-    #     for idx in range(4):
-    #         self.seq.upstreamCellIdx[idx] = prevActiveCells[idx]
-    #
-    #     self.seq.updatePerms(idxColSegments, prevActiveCells)
-    #     for idx in range(128520): # 128520 synapses in column 1
-    #         if idx < 4:
-    #             assert self.seq.synapsePerm[idx] == initPerm+self.seq.permIncrement
-    #         else:
-    #             assert self.seq.synapsePerm[idx] == initPerm-self.seq.permDecrement
-    # #
+    def test_updatePerms(self):
+
+        self.seq.numActivePotentialSynapses = {}
+        initPerm = 3
+        idxColSegments = [i for i in range(2040)] # 2040 segments in column 1 (255*8)
+        prevActiveCells = [33, 65, 70, 1000] # pseudo random list of previous active cells
+        prevWinnerCells = [0]
+        s = 0
+        for segmentIdx in idxColSegments:
+            if s > 254:
+                s = 0
+            self.seq.numActivePotentialSynapses[segmentIdx] = s
+            s += 1
+            idxCellSynapses = self.seq.indexHelper('segment', segmentIdx)
+            for synapse in idxCellSynapses:
+                self.seq.synapsePerm[synapse] = initPerm
+
+        for idx in range(4):
+            self.seq.upstreamCellIdx[idx] = prevActiveCells[idx]
+
+        self.seq.updatePerms(idxColSegments, prevActiveCells, prevWinnerCells)
+        for idx in range(128520): # 128520 synapses in column 1
+            if idx < 4:
+                assert np.allclose(self.seq.synapsePerm[idx], initPerm+self.seq.permIncrement)
+            else:
+                assert np.allclose(self.seq.synapsePerm[idx], initPerm-self.seq.permDecrement)
+
     def test_growSynapses(self):
         # growSynapses(self, segmentIdx, newSynapseCount):
         pass
