@@ -42,7 +42,7 @@ class SequenceMemory:
         self.permDecrement = 0.1
         self.predictedDecrement = 0.05
         self.maxSegmentsPerCell = 255
-        self.maxSynapsePerSegment = 63
+        self.maxSynapsePerSegment = 127
 
         self.activeCells = []
         self.winnerCells = []
@@ -52,20 +52,6 @@ class SequenceMemory:
         self.segmentsInUse = {}
 
         self.totalCells = self.columnCount*self.cellsPerColumn
-
-
-        # '''NOTE ON IMPLEMENTATION - There are an extraordinary number of synapses
-        # ~2048col*8cells/col*255segs/cell*63syns/seg.
-        # This amount is too large for a dictionary so using numpy array to speed
-        # up.  Note, each synapse consists of 3 parameters: an upstream cell, a
-        # downstream cell, and a permanence (or connection strength).  In this
-        # implementation, the downstream cell identity is implied by the index
-        # into 2 numpy arrays while the other 2 parameters are the corresponding
-        # value in each of the respective arrays.  Each initialized to -1 as this
-        # represents a null value.  Using such a large numpy array is cheapest
-        # with only 8 bits (dtype=int8) as a result permanence values and
-        # corresponding initial values, increments, and decrements are scaled from
-        # 0-1 to 1-10.'''
 
         self.upstreamCellIdx = np.ones(self.totalCells*self.maxSegmentsPerCell*
                                        self.maxSynapsePerSegment, dtype=np.float32)
@@ -86,23 +72,16 @@ class SequenceMemory:
         return winningColumnsIdx
 
     def evalActiveColsVersusPreds(self, winningColumnsIdx):
+        print('need to add string note describing function inputs and outputs!')
 
-        prevActiveCells = self.activeCells
-        self.activeCells = []
-        prevWinnerCells = self.winnerCells
-        self.winnerCells = []
-        prevActiveSegments = self.activeSegments
-        self.activeSegments = []
-        prevMatchingSegments = self.matchingSegments
-        self.matchingSegments = []
-        prevNumActivePotentialSynapses = self.numActivePotentialSynapses
-        self.numActivePotentialSynapses = defaultdict(int)
+        self.transferComponentToPrevAndReset()
 
         for c in range(self.columnCount):
             if c in winningColumnsIdx:
                 colActiveSegments, idxColSegments = self.countSegments(c, prevActiveSegments)
                 if len(colActiveSegments) > 0:
-                    self.activatePredictedCol(c, colActiveSegments, prevActiveCells)
+                    self.activatePredictedCol(c, colActiveSegments,
+                                              prevActiveCells, prevWinnerCells)
                     # self.numActivePotentialSynapses = self.activatePredictedCol(c, colActiveSegments, prevActiveCells)
                 else:
                     self.burstColumn(c, prevMatchingSegments, prevActiveCells)
@@ -111,6 +90,21 @@ class SequenceMemory:
                 if len(colMatchingSegments) > 0:
                     self.punishPredictedColumn(c, idxColSegments)
 
+    def transferComponentToPrevAndReset(self):
+        '''Input desired string to append to corresponding self variable.
+        Function transfers stored component from previous iteration into
+        previous and then resets new one for current iteration.'''
+
+        prevActiveCells = self.activeCells.copy()
+        self.activeCells = []
+        prevWinnerCells = self.winnerCells.copy()
+        self.winnerCells = []
+        prevActiveSegments = self.activeSegments.copy()
+        self.activeSegments = []
+        prevMatchingSegments = self.matchingSegments.copy()
+        self.matchingSegments = []
+        prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
+        self.numActivePotentialSynapses = defaultdict(int)
 
     def countSegments(self, c, prevSegments):
         '''Input a column index, c, and return the indices of matching segments
@@ -128,15 +122,16 @@ class SequenceMemory:
 
         return idxMatchOrActiveColSegments, idxColSegments
 
-    def activatePredictedCol(self, c, colActiveSegments, prevActiveCells):
+    def activatePredictedCol(self, c, colActiveSegments, prevActiveCells,
+                             prevWinnerCells):
         '''Input a column index, c, a list of the active segments for all cells
-        in that column, and a list of the previous active cells.  The function
-        generates a list of active cells (i.e. the corresponding cell indices to
-        any active segment(s)).  These cells are also selected as winner cells
-        marking them as presynaptic candidates for synapse growth in the next
-        iteration.  Finally, those synapses which activated the segment are
-        reinforced while those that did not contribute are punished - included
-        in this update, new synapses are added to each segment up to
+        in that column, and a list of the previous active and winner cells.  The
+        function generates a list of active cells (i.e. the corresponding cell
+        indices to any active segment(s)).  These cells are also selected as
+        winner cells marking them as presynaptic candidates for synapse growth
+        in the next iteration.  Finally, those synapses which activated the
+        segment are reinforced while those that did not contribute are punished
+        - included in this update, new synapses are added to each segment up to
         maxNewSynapseCount from the pool of winner cells from the previous
         iteration in order to better recognize new and additional patterns.'''
 
@@ -147,7 +142,7 @@ class SequenceMemory:
             if cellIdx not in self.winnerCells:
                 self.winnerCells.append(cellIdx)
 
-        self.updatePerms(colActiveSegments, prevActiveCells)
+        self.updatePerms(colActiveSegments, prevActiveCells, prevWinnerCells)
 
 
     def updatePerms(self, idxColSegments, prevActiveCells, prevWinnerCells):
@@ -165,9 +160,9 @@ class SequenceMemory:
 
         for segmentIdx in idxColSegments:
             idxCellSynapses = self.indexHelper('segment', segmentIdx)
-            if segmentIdx == 4700160:
-                print(idxCellSynapses)
             for synapseIdx in idxCellSynapses:
+                if self.upstreamCellIdx[synapseIdx] == -1:
+                    break
                 if self.upstreamCellIdx[synapseIdx] in prevActiveCells:
                     self.synapsePerm[synapseIdx] += self.permIncrement
                 else:
@@ -201,20 +196,43 @@ class SequenceMemory:
 
 
     def growSynapses(self, segmentIdx, newSynapseCount, prevWinnerCells):
-        pass
+        '''Input a segment index as an integer to learn on, the number of new
+        synapses to add as integer, and a list of previous winning cells with
+        which to connect patterns to.  Add synapses to those winning cells from
+        the previous timestamp to the specified segment index.'''
+
+        candidates = prevWinnerCells.copy()
+        while len(candidates) > 0 and newSynapseCount > 0:
+            preSynapticCell = random.choice(candidates)
+            candidates.remove(preSynapticCell)
+
+            alreadyConnected = False
+            idxCellSynapses = self.indexHelper('segment', segmentIdx)
+            for synapseIdx in idxCellSynapses:
+                if self.upstreamCellIdx[synapseIdx] == preSynapticCell:
+                    alreadyConnected = True
+                    break
+                elif self.upstreamCellIdx[synapseIdx] == -1:
+                    self.upstreamCellIdx[synapseIdx] = preSynapticCell
+                    self.synapsePerm[synapseIdx] = self.initialPerm
+                    newSynapseCount -= 1
+                    break
 
 
-    def burstColumn(self, c, prevMatchingSegments, prevActiveCells):
+
+    def burstColumn(self, c, prevMatchingSegments, prevActiveCells,
+                    prevWinnerCells):
         '''Inputs: column index, c, list of previous iteration matching segments
-        and list of previous active cells.  The function first activates all
-        cells in the column.  It then searches for any segments from the last
-        iteration that match this column's segments (i.e. synapses > 0 but not
-        enough to make cells become active).  If any of these segments exist,
-        then the winner cell index is selected from the best matching segment;
-        otherwise the least used cell in the column is selected, in which case
-        the first available segment (if any) is selected as the learning segment.
-        Finally, the learning segment's synapses are updated which includes
-        adding new synapses up maxNewSynapseCount to learn new patterns.'''
+        and list of previous active and winner cells.  The function first
+        activates all cells in the column.  It then searches for any segments
+        from the last iteration that match this column's segments (i.e.
+        synapses > 0 but not enough to make cells become active).  If any of
+        these segments exist, then the winner cell index is selected from the
+        best matching segment; otherwise the least used cell in the column is
+        selected, in which case the first available segment (if any) is selected
+        as the learning segment.  Finally, the learning segment's synapses are
+        updated which includes adding new synapses up maxNewSynapseCount to
+        learn new patterns.'''
 
         idxColSegments = []
         idxColCells = self.indexHelper('column', c)
@@ -233,7 +251,8 @@ class SequenceMemory:
             return
         else:
             self.winnerCells.append(winnerCell)
-            self.updatePerms(learningSegmentIdx, prevActiveCells)
+            self.updatePerms(learningSegmentIdx, prevActiveCells,
+                             prevWinnerCells)
 
 
     def bestMatchingSegment(self, c, matchSegsInCol):
@@ -249,6 +268,7 @@ class SequenceMemory:
                 bestScore = self.numActivePotentialSynapses[segmentIdx]
 
         return bestMatchingSeg
+
 
     def leastUsedCell(self, c):
         '''Input a column index, c and return a cell index corresponding to the
@@ -266,6 +286,7 @@ class SequenceMemory:
         leastUsedCellsList = [k for k,v in leastUsedCells.items() if v == minval]
 
         return random.choice(leastUsedCellsList)
+
 
     def learnOnNewSegment(self, c, cell):
         '''Input a column index, c, and cell index, cell.  Return segment index
@@ -286,6 +307,7 @@ class SequenceMemory:
 
         return nextSeg
 
+
     def punishPredictedColumn(self, c, idxColSegments):
         '''Input a column index, c, that contains matching segments and punish
         the synapses that caused these false positive matches.'''
@@ -295,61 +317,7 @@ class SequenceMemory:
         for segmentIdx in falsePositiveSegments:
             idxCellSynapses = self.indexHelper('segment', segmentIdx)
             for synapseIdx in idxCellSynapses:
+                if self.upstreamCellIdx[synapseIdx] == -1:
+                    break
                 if self.upstreamCellIdx[synapseIdx] in self.activeCells:
                     self.synapsePerm[synapseIdx] -= self.predictedDecrement
-
-
-'''Combinatorally speaking, the SequenceMemory algorithm needs to encompass an
-enormous potential number of connections.  It is difficult to implement this
-using data structures in software because of their massive size causing memory
-issues and bogging down the program.  The strategy used here is to assign each
-synapse to a unique integer and then to carefully select only those synapses
-that are needed at each timestamp.  As a result, between each main iteration the
-list(s) of active columns, cells, segments, and synapses need to be cleared to
-allow the next pass through to work from a clean slate.  It is imperative that
-careful consideration is made before changing this synapse labeling scheme to
-ensure the algorithm still behaves as desired.'''
-
-
-
-
-
-
-
-
-
-        #### revamp activate predicted col  create separate function for active segments and matching segments and num active potential synapses!!!!!
-
-
-
-        # ''' and activate any cells that were in a
-        # predicted state i.e. possess an active segment.  The function also
-        # records those synapses that were not active but could potentially
-        # become active at a later point (matching segments).  The function
-        # returns a dictionary consisting of the number of active potential
-        # synapses for each segment (to determine how many new connections to
-        # grow).'''
-        # idxColCells = self.indexHelper('column', c)
-        # for cellIdx in idxColCells:
-        #     if cellIdx in self.activeCells:
-        #         idxCellSegments = self.indexHelper('cell', cellIdx)
-        #         for segmentIdx in idxCellSegments:
-        #             idxCellSynapses = self.indexHelper('segment', segmentIdx)
-        #             numActiveConnected = 0
-        #             numActivePotential = 0
-        #             for synapseIdx in idxCellSynapses:
-        #                 if self.upstreamCellIdx[synapseIdx] in prevActiveCells:
-        #                     if self.synapsePerm[synapseIdx] > self.connectedPerm:
-        #                         numActiveConnected += 1
-        #                     if self.synapsePerm[synapseIdx] >= 0:
-        #                         numActivePotential += 1
-        #
-        #             if numActiveConnected>self.activationThreshold:
-        #                 self.activeSegments.append(segmentIdx)
-        #
-        #             if numActivePotential>self.minThreshold:
-        #                 self.matchingSegments.append(segmentIdx)
-        #
-        #             self.numActivePotentialSynapses[segmentIdx] = numActivePotential
-        #
-        # return self.numActivePotentialSynapses
