@@ -82,13 +82,14 @@ class SequenceMemory:
                 if len(colActiveSegments) > 0:
                     self.activatePredictedCol(c, colActiveSegments,
                                               prevActiveCells, prevWinnerCells)
-                    # self.numActivePotentialSynapses = self.activatePredictedCol(c, colActiveSegments, prevActiveCells)
                 else:
                     self.burstColumn(c, prevMatchingSegments, prevActiveCells)
             else:
                 colMatchingSegments, idxColSegments = self.countSegments(c, prevMatchingSegments)
                 if len(colMatchingSegments) > 0:
                     self.punishPredictedColumn(c, idxColSegments)
+
+        self.activateDendriticSegments()
 
     def transferComponentToPrevAndReset(self):
         '''Input desired string to append to corresponding self variable.
@@ -103,8 +104,15 @@ class SequenceMemory:
         self.activeSegments = []
         prevMatchingSegments = self.matchingSegments.copy()
         self.matchingSegments = []
-        prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
+        if len(prevActiveCell) == 0: # don't want to grow synapses on first iteraton
+            prevNumActivePotentialSynapses = {key: self.maxNewSynapseCount
+                                              for key in
+                                              self.numActivePotentialSynapses}
+        else:
+            prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
         self.numActivePotentialSynapses = defaultdict(int)
+
+        return
 
     def countSegments(self, c, prevSegments):
         '''Input a column index, c, and return the indices of matching segments
@@ -321,3 +329,7 @@ class SequenceMemory:
                     break
                 if self.upstreamCellIdx[synapseIdx] in self.activeCells:
                     self.synapsePerm[synapseIdx] -= self.predictedDecrement
+
+
+    def activateDendriticSegments(self):
+        print('need to add this function')
