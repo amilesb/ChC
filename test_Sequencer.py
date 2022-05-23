@@ -51,10 +51,9 @@ class TestSequenceMemory(unittest.TestCase):
     def test_activatePredictedCol(self, mockedUpdate):
         c = 0
         colActiveSegments = [0, 300]
-        prevActiveCells = [0]
-        prevWinnerCells = prevActiveCells
-        self.seq.activatePredictedCol(c, colActiveSegments, prevActiveCells,
-                                      prevWinnerCells)
+        self.seq.prevActiveCells = [0]
+        self.seq.prevWinnerCells = self.seq.prevActiveCells
+        self.seq.activatePredictedCol(c, colActiveSegments)
 
         assert self.seq.activeCells == [0, 1]
         assert self.seq.winnerCells == [0, 1]
@@ -64,8 +63,8 @@ class TestSequenceMemory(unittest.TestCase):
         self.seq.numActivePotentialSynapses = {}
         initPerm = 3
         idxColSegments = [i for i in range(2040)] # 2040 segments in column 1 (255*8)
-        prevActiveCells = [33, 65, 70, 1000] # pseudo random list of previous active cells
-        prevWinnerCells = [0]
+        self.seq.prevActiveCells = [33, 65, 70, 1000] # pseudo random list of previous active cells
+        self.seq.prevWinnerCells = [0]
         s = 0
         for segmentIdx in idxColSegments:
             if s > 254:
@@ -77,11 +76,11 @@ class TestSequenceMemory(unittest.TestCase):
                 self.seq.synapsePerm[synapse] = initPerm
 
         for idx in range(4):
-            self.seq.upstreamCellIdx[idx] = prevActiveCells[idx]
+            self.seq.upstreamCellIdx[idx] = self.seq.prevActiveCells[idx]
         self.seq.upstreamCellIdx[4] = 4
 
         numSynsColOne = self.seq.cellsPerColumn*self.seq.maxSegmentsPerCell*self.seq.maxSynapsePerSegment
-        self.seq.updatePerms(idxColSegments, prevActiveCells, prevWinnerCells)
+        self.seq.updatePerms(idxColSegments)
         for idx in range(numSynsColOne):
             if idx < 4:
                 assert np.allclose(self.seq.synapsePerm[idx], initPerm+self.seq.permIncrement)
@@ -94,14 +93,14 @@ class TestSequenceMemory(unittest.TestCase):
     def test_growSynapses(self, mockedChoice):
         segmentIdx = 0
         newSynapseCount = 2
-        prevWinnerCells = [0, 3, 5, 11, 50]
-        mockedChoice.side_effect = prevWinnerCells[:]
-        self.seq.upstreamCellIdx[0:2] = prevWinnerCells[0:2]
-        self.seq.growSynapses(segmentIdx, newSynapseCount, prevWinnerCells)
+        self.seq.prevWinnerCells = [0, 3, 5, 11, 50]
+        mockedChoice.side_effect = self.seq.prevWinnerCells[:]
+        self.seq.upstreamCellIdx[0:2] = self.seq.prevWinnerCells[0:2]
+        self.seq.growSynapses(segmentIdx, newSynapseCount)
 
         upstreamCellIndices = []
         for i in range(2,4):
-            assert np.allclose(self.seq.upstreamCellIdx[i], prevWinnerCells[i-5])
+            assert np.allclose(self.seq.upstreamCellIdx[i], self.seq.prevWinnerCells[i-5])
             assert np.allclose(self.seq.synapsePerm[i], self.seq.initialPerm)
         for i in range(4,8):
             upstreamCellIndices.append(self.seq.upstreamCellIdx[i])
@@ -133,11 +132,11 @@ class TestSequenceMemory(unittest.TestCase):
         mocked_leastUsedCell.return_value = 8
         step = 96
         end = 384
-        prevActiveCells = [0]
-        prevWinnerCells = [0]
+        self.seq.prevActiveCells = [0]
+        self.seq.prevWinnerCells = [0]
         prevMatchingSegments = []
 
-        self.seq.burstColumn(0, prevMatchingSegments, prevActiveCells, prevWinnerCells)
+        self.seq.burstColumn(0, prevMatchingSegments)
 
         assert self.seq.winnerCells == [8]
 
@@ -146,7 +145,7 @@ class TestSequenceMemory(unittest.TestCase):
         segsPerColumn = self.seq.cellsPerColumn * self.seq.maxSegmentsPerCell
         prevMatchingSegments = [x for x in range(0, end*segsPerColumn, step*segsPerColumn)]
         for i in range(0, end, step):
-            self.seq.burstColumn(i, prevMatchingSegments, prevActiveCells, prevWinnerCells)
+            self.seq.burstColumn(i, prevMatchingSegments)
 
         assert len(self.seq.activeCells) == self.seq.cellsPerColumn*end/step
         assert self.seq.winnerCells == [i for i in range(0, end*self.seq.cellsPerColumn, step*self.seq.cellsPerColumn)]
