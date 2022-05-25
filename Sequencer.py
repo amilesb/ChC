@@ -49,6 +49,7 @@ class SequenceMemory:
         self.activeSegments = []
         self.matchingSegments = []
         self.numActivePotentialSynapses = defaultdict(int)
+        self.prevNumActivePotentialSynapses = defaultdict(lambda:self.maxNewSynapseCount)
         self.segmentsInUse = {}
 
         self.totalCells = self.columnCount*self.cellsPerColumn
@@ -72,7 +73,14 @@ class SequenceMemory:
         return winningColumnsIdx
 
     def evalActiveColsVersusPreds(self, winningColumnsIdx):
-        print('need to add string note describing function inputs and outputs!')
+        '''Input a list of winning column indices (SDR) and process this input
+        through the sequence memory.  First, activate predicted columns that
+        match the incoming SDR else burst them if unpredicted.  Next, any
+        column which was predicted bc it contained previous matching segments
+        but that did not become active i.e. isn't in the input SDR gets
+        punished for making a false prediction.  Finally, predictions based on
+        the current input for the next input get made by calling
+        activateDendriticSegments.'''
 
         self.transferComponentToPrevAndReset()
 
@@ -84,7 +92,7 @@ class SequenceMemory:
                 else:
                     self.burstColumn(c)
             else:
-                colMatchingSegments, idxColSegments = self.countSegments(c, prevMatchingSegments)
+                colMatchingSegments, idxColSegments = self.countSegments(c, self.prevMatchingSegments)
                 if len(colMatchingSegments) > 0:
                     self.punishPredictedColumn(c, idxColSegments)
 
@@ -104,9 +112,9 @@ class SequenceMemory:
         self.prevMatchingSegments = self.matchingSegments.copy()
         self.matchingSegments = []
         if len(self.prevActiveCells) == 0: # don't want to grow synapses on first iteraton
-            prevNumActivePotentialSynapses = defaultdict(lambda:self.maxNewSynapseCount)
+            self.prevNumActivePotentialSynapses = defaultdict(lambda:self.maxNewSynapseCount)
         else:
-            prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
+            self.prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
         self.numActivePotentialSynapses = defaultdict(int)
 
     def countSegments(self, c, prevSegments):
@@ -171,7 +179,7 @@ class SequenceMemory:
                     self.synapsePerm[synapseIdx] -= self.permDecrement
 
             newSynapseCount = (self.maxNewSynapseCount -
-                               self.numActivePotentialSynapses[segmentIdx])
+                               self.prevNumActivePotentialSynapses[segmentIdx])
 
             self.growSynapses(segmentIdx, newSynapseCount)
 
@@ -263,9 +271,9 @@ class SequenceMemory:
         bestMatchingSeg = None
         bestScore = -1
         for segmentIdx in matchSegsInCol:
-            if self.numActivePotentialSynapses[segmentIdx] > bestScore:
+            if self.prevNumActivePotentialSynapses[segmentIdx] > bestScore:
                 bestMatchingSeg = segmentIdx
-                bestScore = self.numActivePotentialSynapses[segmentIdx]
+                bestScore = self.prevNumActivePotentialSynapses[segmentIdx]
 
         return bestMatchingSeg
 
@@ -323,4 +331,25 @@ class SequenceMemory:
 
 
     def activateDendriticSegments(self):
-        print('need to add this function')
+        '''help'''
+        numActiveConnected = defaultdict(int)
+        numActivePotential = defaultdict(int)
+        # computationally cheaper to inspect only teh active cells versus every segment on every cell in every column!
+        for cellIdx in self.activeCells:
+            targetZero = self.upstreamCellIdx.copy() - cellIdx
+            targetSynapseIndxs = np.where(targetZero == 0)[0]
+            if targetSynapseIndxs.size>0:
+                for synapseIdx in targetSynapseIndxs:
+                    segmentIdx = np.floor(synapseIdx/self.maxSynapsePerSegment)
+                    if self.synapsePerm[synapseIdx] > self.connectedPerm:
+                        numActiveConnected[segmentIdx] += 1
+                    if self.synapsePerm[synapseIdx] > 0:
+                        numActivePotential[segmentIdx] += 1
+
+        for segmentIdx, numActiveConnects in numActiveConnected.items():
+            if numActiveConnects > self.activationThreshold:
+                self.activeSegments.append(segmentIdx)
+        for segmentIdx, numActivePotents in numActivePotential.items():
+            if numActivePotents > self.minThreshold:
+                self.matchingSegments.append(segmentIdx)
+            self.numActivePotential[segmentIdx] = numActivePotents

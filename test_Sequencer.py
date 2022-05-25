@@ -168,9 +168,9 @@ class TestSequenceMemory(unittest.TestCase):
         matchSegsInCol = [i for i in range(0, 21, 3)]
         for i in range(21):
             if i < 13:
-                self.seq.numActivePotentialSynapses[i] = i
+                self.seq.prevNumActivePotentialSynapses[i] = i
             else:
-                self.seq.numActivePotentialSynapses[i] = 0
+                self.seq.prevNumActivePotentialSynapses[i] = 0
 
         bestMatchSeg = self.seq.bestMatchingSegment(c, matchSegsInCol)
 
