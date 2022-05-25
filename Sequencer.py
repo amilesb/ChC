@@ -78,11 +78,11 @@ class SequenceMemory:
 
         for c in range(self.columnCount):
             if c in winningColumnsIdx:
-                colActiveSegments, idxColSegments = self.countSegments(c, prevActiveSegments)
+                colActiveSegments, idxColSegments = self.countSegments(c, self.prevActiveSegments)
                 if len(colActiveSegments) > 0:
                     self.activatePredictedCol(c, colActiveSegments)
                 else:
-                    self.burstColumn(c, prevMatchingSegments)
+                    self.burstColumn(c)
             else:
                 colMatchingSegments, idxColSegments = self.countSegments(c, prevMatchingSegments)
                 if len(colMatchingSegments) > 0:
@@ -99,14 +99,12 @@ class SequenceMemory:
         self.activeCells = []
         self.prevWinnerCells = self.winnerCells.copy()
         self.winnerCells = []
-        prevActiveSegments = self.activeSegments.copy()
+        self.prevActiveSegments = self.activeSegments.copy()
         self.activeSegments = []
-        prevMatchingSegments = self.matchingSegments.copy()
+        self.prevMatchingSegments = self.matchingSegments.copy()
         self.matchingSegments = []
-        if len(prevActiveCell) == 0: # don't want to grow synapses on first iteraton
-            prevNumActivePotentialSynapses = {key: self.maxNewSynapseCount
-                                              for key in
-                                              self.numActivePotentialSynapses}
+        if len(self.prevActiveCells) == 0: # don't want to grow synapses on first iteraton
+            prevNumActivePotentialSynapses = defaultdict(lambda:self.maxNewSynapseCount)
         else:
             prevNumActivePotentialSynapses = self.numActivePotentialSynapses.copy()
         self.numActivePotentialSynapses = defaultdict(int)
@@ -224,7 +222,7 @@ class SequenceMemory:
 
 
 
-    def burstColumn(self, c, prevMatchingSegments):
+    def burstColumn(self, c):
         '''Inputs: column index, c, list of previous iteration matching segments
         and list of previous active and winner cells.  The function first
         activates all cells in the column.  It then searches for any segments
@@ -242,7 +240,7 @@ class SequenceMemory:
         for cellIdx in idxColCells:
             self.activeCells.append(cellIdx)
             idxColSegments.extend(self.indexHelper('cell', cellIdx))
-        matchSegsInCol = set(prevMatchingSegments) & set(idxColSegments)
+        matchSegsInCol = set(self.prevMatchingSegments) & set(idxColSegments)
         if matchSegsInCol:
             learningSegmentIdx = self.bestMatchingSegment(c, matchSegsInCol)
             winnerCell = np.floor(learningSegmentIdx/self.maxSegmentsPerCell)

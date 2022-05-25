@@ -11,7 +11,6 @@ from Encoder import Encoder
 from Spatial_Pooler import Spatial_Pooler
 from Sequencer import SequenceMemory
 
-
 class TestSequenceMemory(unittest.TestCase):
 
     def setUp(self):
@@ -33,7 +32,20 @@ class TestSequenceMemory(unittest.TestCase):
         assert set(winningColumnsIdx).issubset(set(columns))
 
     def test_evalActiveColsVersusPreds(self):
+        # self.seq.evalActiveColsVersusPreds([0, 1])
         pass
+
+
+    # def test_transferComponentToPrevAndReset():
+    #     self.seq.activeCells = [0, 1, 100]
+    #     self.seq.numActivePotentialSynapses = {0:10, 1:5}
+    #     self.seq.transferComponentToPrevAndReset()
+    #
+    #     assert self.seq.prevActiveCells == [0, 1, 100]
+    #     assert self.seq.prevNumActivePotentialSynapses == {0:10, 1:5}
+    #
+    #     self.seq.transferComponentToPrevAndReset()
+    #     assert self.seq.prevNumActivePotentialSynapses == {0:self.seq.maxNewSynapseCount, 1:self.seq.maxNewSynapseCount}
 
     def test_countSegments(self):
         segsPerColumn = self.seq.cellsPerColumn*self.seq.maxSegmentsPerCell
@@ -134,18 +146,18 @@ class TestSequenceMemory(unittest.TestCase):
         end = 384
         self.seq.prevActiveCells = [0]
         self.seq.prevWinnerCells = [0]
-        prevMatchingSegments = []
+        self.seq.prevMatchingSegments = []
 
-        self.seq.burstColumn(0, prevMatchingSegments)
+        self.seq.burstColumn(0)
 
         assert self.seq.winnerCells == [8]
 
         self.seq.winnerCells = [] # reset list
         self.seq.activeCells = []
         segsPerColumn = self.seq.cellsPerColumn * self.seq.maxSegmentsPerCell
-        prevMatchingSegments = [x for x in range(0, end*segsPerColumn, step*segsPerColumn)]
+        self.seq.prevMatchingSegments = [x for x in range(0, end*segsPerColumn, step*segsPerColumn)]
         for i in range(0, end, step):
-            self.seq.burstColumn(i, prevMatchingSegments)
+            self.seq.burstColumn(i)
 
         assert len(self.seq.activeCells) == self.seq.cellsPerColumn*end/step
         assert self.seq.winnerCells == [i for i in range(0, end*self.seq.cellsPerColumn, step*self.seq.cellsPerColumn)]
@@ -206,7 +218,9 @@ class TestSequenceMemory(unittest.TestCase):
             else:
                 assert np.allclose(self.seq.synapsePerm[idx], initPerm)
 
-
+    def test_activateDendriticSegments(self):
+        pass
+        # self.seq.activateDendriticSegments(self):
 
 if __name__ == '__main__':
     unittest.main()
