@@ -36,16 +36,16 @@ class TestSequenceMemory(unittest.TestCase):
         pass
 
 
-    # def test_transferComponentToPrevAndReset():
-    #     self.seq.activeCells = [0, 1, 100]
-    #     self.seq.numActivePotentialSynapses = {0:10, 1:5}
-    #     self.seq.transferComponentToPrevAndReset()
-    #
-    #     assert self.seq.prevActiveCells == [0, 1, 100]
-    #     assert self.seq.prevNumActivePotentialSynapses == {0:10, 1:5}
-    #
-    #     self.seq.transferComponentToPrevAndReset()
-    #     assert self.seq.prevNumActivePotentialSynapses == {0:self.seq.maxNewSynapseCount, 1:self.seq.maxNewSynapseCount}
+    def test_transferComponentToPrevAndReset(self):
+        self.seq.activeCells = [0, 1, 100]
+        self.seq.numActivePotentialSynapses = {0:10, 1:5}
+        self.seq.transferComponentToPrevAndReset()
+
+        assert self.seq.prevActiveCells == [0, 1, 100]
+        assert self.seq.prevNumActivePotentialSynapses == {0:10, 1:5}
+
+        self.seq.transferComponentToPrevAndReset()
+        assert self.seq.prevNumActivePotentialSynapses[0] == self.seq.maxNewSynapseCount
 
     def test_countSegments(self):
         segsPerColumn = self.seq.cellsPerColumn*self.seq.maxSegmentsPerCell
