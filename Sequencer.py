@@ -331,7 +331,18 @@ class SequenceMemory:
 
 
     def activateDendriticSegments(self):
-        '''help'''
+        '''This function examines the current input (SDR) and sets up predictions
+        for the next input.  There are 2 steps to this process.  First, for each
+        cell activated by the current input (activeCells) the synapse indices
+        are identified for the upstream connections that match these active
+        cells.  Then, for each of these synaspe indices the corresponding
+        segment index is calculated and the 2 counter dictionaries are updated
+        to keep track of how many synapses on the segments of interest qualify.
+        Finally, once completed each of these dictionaries is processed to
+        determine which segments to activate and add to matching along with
+        storing the number of active potential synapses with which to control
+        how many new synapses are added in the next iteration (see growSynapses).
+        '''
         numActiveConnected = defaultdict(int)
         numActivePotential = defaultdict(int)
         # computationally cheaper to inspect only teh active cells versus every segment on every cell in every column!
@@ -352,4 +363,4 @@ class SequenceMemory:
         for segmentIdx, numActivePotents in numActivePotential.items():
             if numActivePotents > self.minThreshold:
                 self.matchingSegments.append(segmentIdx)
-            self.numActivePotential[segmentIdx] = numActivePotents
+            self.numActivePotentialSynapses[segmentIdx] = numActivePotents

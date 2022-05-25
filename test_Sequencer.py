@@ -218,9 +218,25 @@ class TestSequenceMemory(unittest.TestCase):
             else:
                 assert np.allclose(self.seq.synapsePerm[idx], initPerm)
 
+
     def test_activateDendriticSegments(self):
-        pass
-        # self.seq.activateDendriticSegments(self):
+        self.seq.activeCells = [0, 100, 101, 500]
+        perms = [0.1, 0.8, 0.8, 0.8]
+        self.seq.activationThreshold = 1
+        j = 0
+        for i in [0, 1, 2, 1000]:
+            self.seq.upstreamCellIdx[i] = self.seq.activeCells[j]
+            self.seq.synapsePerm[i] = perms[j]
+            j += 1
+
+        seg1000 = np.floor(1000/self.seq.maxSynapsePerSegment)
+
+        self.seq.activateDendriticSegments()
+
+        assert self.seq.activeSegments == [0]
+        assert self.seq.matchingSegments == [0, seg1000]
+        assert self.seq.numActivePotentialSynapses[0] == 3
+        assert self.seq.numActivePotentialSynapses[seg1000] == 1
 
 if __name__ == '__main__':
     unittest.main()
