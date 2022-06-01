@@ -319,14 +319,14 @@ class SequenceMemory:
         '''Input a column index, c, that contains matching segments and punish
         the synapses that caused these false positive matches.'''
 
-        falsePositiveSegments = set(idxColSegments) & set(self.matchingSegments)
+        falsePositiveSegments = set(idxColSegments) & set(self.prevMatchingSegments)
 
         for segmentIdx in falsePositiveSegments:
             idxCellSynapses = self.indexHelper('segment', segmentIdx)
             for synapseIdx in idxCellSynapses:
                 if self.upstreamCellIdx[synapseIdx] == -1:
                     break
-                if self.upstreamCellIdx[synapseIdx] in self.activeCells:
+                if self.upstreamCellIdx[synapseIdx] in self.prevActiveCells:
                     self.synapsePerm[synapseIdx] -= self.predictedDecrement
 
 

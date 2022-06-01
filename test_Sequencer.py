@@ -32,8 +32,28 @@ class TestSequenceMemory(unittest.TestCase):
         assert set(winningColumnsIdx).issubset(set(columns))
 
     def test_evalActiveColsVersusPreds(self):
-        # self.seq.evalActiveColsVersusPreds([0, 1])
-        pass
+        self.seq.activeSegments = [i for i in range(30)]
+        firstSegOfColTwo = 2*self.seq.cellsPerColumn*self.seq.maxSegmentsPerCell
+        self.seq.matchingSegments = [i for i in range(firstSegOfColTwo, firstSegOfColTwo+30)]
+
+        upstreamCell = 100
+        self.seq.activeCells = [upstreamCell]
+        firstSynapseIdxOfColTwo = firstSegOfColTwo*self.seq.maxSynapsePerSegment
+        self.seq.upstreamCellIdx[firstSynapseIdxOfColTwo] = upstreamCell
+
+        self.seq.evalActiveColsVersusPreds([0, 1])
+        # test activatePredictedCol condition executed
+        assert self.seq.activeCells[0] == 0
+        assert self.seq.winnerCells[0] == 0
+
+        # test burstColumn condition executed
+        assert set([i for i in range(8, 16)]).issubset(set(self.seq.activeCells))
+        assert 7 < self.seq.winnerCells[1] < 16
+
+        # test punishPredictedColumn condition executed
+        assert np.allclose(self.seq.synapsePerm[firstSynapseIdxOfColTwo], -1-self.seq.predictedDecrement)
+
+
 
 
     def test_transferComponentToPrevAndReset(self):
@@ -200,15 +220,15 @@ class TestSequenceMemory(unittest.TestCase):
     def test_punishPredictedColumn(self):
         c = 0
         initPerm = 0.5
-        self.seq.matchingSegments = [i for i in range(0, 21, 3)]
+        self.seq.prevMatchingSegments = [i for i in range(0, 21, 3)]
         idxColSegments = [0, 5, 11]
-        self.seq.activeCells = [0]
+        self.seq.prevActiveCells = [0]
         numSynsColOne = self.seq.cellsPerColumn*self.seq.maxSegmentsPerCell*self.seq.maxSynapsePerSegment
 
         for synapse in range(numSynsColOne):
             self.seq.synapsePerm[synapse] = initPerm
             if synapse < 10:
-                self.seq.upstreamCellIdx[synapse] = self.seq.activeCells[0]
+                self.seq.upstreamCellIdx[synapse] = self.seq.prevActiveCells[0]
 
         self.seq.punishPredictedColumn(c, idxColSegments)
 
