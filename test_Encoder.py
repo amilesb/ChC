@@ -8,29 +8,24 @@ from Encoder import Encoder
 class TestEncoder(unittest.TestCase):
 
     def setUp(self):
-        self.a = np.array([[0, 1, 0, 1], [0, 1, 0, 1], [1, 0, 0, 0], [0, 0, 0, 1]])
-        self.encoded = Encoder(self.a)
+        self.testArray = np.array([[0, 1, 0, 1], [0, 1, 0, 1], [1, 0, 0, 0], [0, 0, 0, 1]])
+        self.encoded = Encoder()
+        self.coordinates = [[0, 1], [0, 3], [1, 1], [1, 3], [2, 0], [3, 3]]
 
-    def test_Prox_Score(self):
-        num_active = self.encoded.num_active
-        proximity = self.encoded.proximity
+    def test_retrieveBinaryValueInputAndCoordinates(self):
+        valInput, coordinates = self.encoded.retrieveBinaryValueInputAndCoordinates(self.testArray)
 
-        assert num_active == 6
-        assert proximity == 35.48650249088339
+        assert valInput == int('0101010110000001', 2)
+        assert coordinates == self.coordinates
 
-    def test_Compute_Index(self):
-        type_input = ['input_piece', 'num_active', 'prox_Score']
-        value = [21889, 6, 35.48650249088339]
-        index_result = [127, 142, 52]
-        for i in range(len(type_input)):
-            index = self.encoded.compute_Index(value[i], type_input[i])
-            assert index == index_result[i]
+    def test_prox_Score(self):
+        valNumActive, valProximity = self.encoded.prox_Score(self.coordinates)
 
-        with self.assertRaises(ValueError):
-            self.encoded.compute_Index(0,'wrong type')
+        assert valNumActive == 6
+        assert valProximity == 35.48650249088339
 
     def test_Build_Encoding(self):
-        result = self.encoded.build_Encoding()
+        result = self.encoded.build_Encoding(self.testArray)
 
         assert len(result) == 1200
 
@@ -40,6 +35,19 @@ class TestEncoder(unittest.TestCase):
                 counter += 1
 
         assert counter == 60
+
+    def test_Compute_Index(self):
+        type_input = self.encoded.variable_types#['input_piece', 'num_active', 'prox_Score']
+        value = [21889, 6, 35.48650249088339]
+        index_result = [127, 142, 52]
+        for i in range(len(type_input)):
+            index = self.encoded.compute_Index(type_input[i], value[i])
+            assert index == index_result[i]
+
+        with self.assertRaises(ValueError):
+            self.encoded.compute_Index(0,'wrong type')
+
+
 
 
 if __name__ == '__main__':
