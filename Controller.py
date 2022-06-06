@@ -28,6 +28,7 @@ class Controller:
         self.REC_FLD_LENGTH = 4
         stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         num_receptive_fields = stride**2 # 1024
+        self.enc = Encoder()
 
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
                                  y=4, width=4, height=3, angle=0):
@@ -43,7 +44,7 @@ class Controller:
 
         returns:
         pShape: numpy array with specified shape perimeter defined within
-        attachedChc: dictionary which maps chandelier cells to the input_array
+        attachedChC: dictionary which maps chandelier cells to the input_array
         '''
         pShape = Polygon(array_size=array_size, form=form, x=x, y=y, width=width,
                         height=height, angle=angle)
@@ -53,7 +54,6 @@ class Controller:
         pShape.insert_Polygon()
 
         pShape.display_Polygon(pShape.input_array, angle=pShape.angle)
-
 
         if os.path.exists(f'ChC_size_{array_size}'):
             with open(f'ChC_size_{array_size}', 'rb') as dicts_handle:
@@ -68,49 +68,47 @@ class Controller:
 
         return pShape, attachedChC
 
+    def extractEncodedFeatures(self, input_array=pshape, ChCs=attachedChC):
+        encodedFeatures = {}
+        centerRF = (pShape.shape[0]//2, pShape.shape[1]//2)
+        filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
+
+        encoding = self.applyReceptiveField(centerRF, filter, attachedChC)
 
 
-max_gray = pShape.MAX_INPUT # 255
-max_tot_chc_wght = attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT # 40
-
-def calculate_Threshold_Filter(max_gray, max_tot_chc_wght):
-    '''Inputs are scalar values representing the maximum grascale pixel
-    intensity and the maximum total chandelier cell combined weight at an
-    active point in the input space.  Function returns a scalar filter value
-    that is used to apply a threshold to the an arbitrary value in the input
-    space.'''
-    return max_gray/max_tot_chc_wght
-
-corner_start = (pShape.pShape[0]//2, pShape.pShape[1]//2)
-filter = calculate_Threshold_Filter(max_gray, max_tot_chc_wght)
 
 
-def apply_Receptive_Field(length=REC_FLD_LENGTH, corner_start=corner_start,
-                          threshold=threshold, filter=filter):
-    '''corner_start is point in the input space designating upper left corner of the
-    receptive field.  Receptive field length represents the size of the
-    receptive field.  Function returns an array of the same size as the
-    receptive field filtered by the threshold set from the connected chandelier
-    cell weights.'''
+    def applyReceptiveField(length=self.REC_FLD_LENGTH, threshold=0,
+                            centerRF, filter, attachedChC):
+        '''centerRF is point in the input space designating upper left corner of the
+        receptive field.  Receptive field length represents the size of the
+        receptive field.  Function returns an array of the same size as the
+        receptive field filtered by the threshold set from the connected chandelier
+        cell weights.'''
 
-    # check if receptive field falls off input space and backup if so
-    if corner_start[0] > pShape.pShape[0]-length:
-        start_x = pShape.pShape[0]-length
-    else:
-        start_x = corner_start[0]
-    if corner_start[1] > pShape.pShape[1]-length:
-        start_y = pShape.pShape[0]-length
-    else:
-        start_y = corner_start[1]
+        # check if receptive field falls off input space and backup if so
+        if centerRF[0] > pShape.shape[0]-length:
+            start_x = pShape.shape[0]-length
+        else:
+            start_x = centerRF[0]
+        if centerRF[1] > pShape.shape[1]-length:
+            start_y = pShape.shape[0]-length
+        else:
+            start_y = centerRF[1]
 
-    rec_fld_filter = np.zeros([length, length])
-    for i in range(start_x, start_x+REC_FLD_LENGTH):
-        for j in range(start_y, start_y+REC_FLD_LENGTH):
-            weight = attachedChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
-            result = max(pShape[(i,j)] - filter*weight, 0)
-            if result > threshold:
-                rec_fld_filter[(i,j)] = result
-    encoding = Encoder(rec_fld_filter).build_Encoding()
+
+        result = np.zeros([length, length])
+        for i in range(start_x, start_x+REC_FLD_LENGTH):
+            for j in range(start_y, start_y+REC_FLD_LENGTH):
+                weight = attachedChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
+                result[i, j] = max(pShape[(i,j)] - filter*weight, 0)
+        binaryInputPiece = np.where(result > threshold, 1, 0)
+
+        encoding = self.enc.build_Encoding(binaryInputPiece)
+
+
+
+
 
 # build SDR from encoding!
 

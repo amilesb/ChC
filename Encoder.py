@@ -3,6 +3,8 @@ import sys
 np.set_printoptions(threshold=sys.maxsize)
 
 
+#### Note on encoding; in mammals ~20+ retinal ganglion cells (RGC) allow higher dimensional spatial information to be encoded so can use exta dimensions to represent more than single on bit in input (i.e. high firing rate implies 4 bits on in square configuration within receptive field versus 4 random bits on etc...)
+
 class Encoder:
     '''Create a geometric encoder to map active points in 2D space to a fixed
     encoding which can then be passed on to a spatial pooling algorithm.'''
@@ -107,7 +109,7 @@ class Encoder:
             max = self.size
         elif type == 'prox_Score':
             min = 0.
-            max = 257.02591608065126 # see helperMaxValueProximityScore()
+            max = self.helperMaxValueProximityScore(array_length=np.floor(np.sqrt(self.size))) # 257.02591608065126 = default for array length = 4
         else:
             raise ValueError('wrong or no type provided.')
         range = max-min
@@ -115,11 +117,11 @@ class Encoder:
 
         return index
 
-    def helperMaxValueProximityScore(self, array_length=4):
+    def helperMaxValueProximityScore(self, array_length):
         '''A simple helper function that calculates the proximity score for an
         array with all bits on i.e. the array corresponding to the maximum
         proximity score'''
-
+        array_length = array_length.astype(np.int64)
         x = np.ones([array_length, array_length], dtype=int)
         e = Encoder()
         valInput, coordinates = self.retrieveBinaryValueInputAndCoordinates(x)
