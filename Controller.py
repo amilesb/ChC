@@ -241,8 +241,6 @@ class Graph:
             if self.isSafe(x, y, visited, value):
                 islSize += 1
                 centerRF = self.calcMovingAvgCenterRF(islSize, centerRF, x, y)
-                print('value', value)
-                print(centerRF)
                 islandCenters[index] = centerRF
                 islandSize[index] = islSize
                 self.islandDict[value].update({'islandCenters': islandCenters,
@@ -268,7 +266,7 @@ class Graph:
 
         return centerRF
 
-    def countIslands(self, value, centerRF):
+    def countIslands(self, value):
         '''Main function which creates a boolean array of visited cells and
         counts number of connected components.
 
@@ -295,6 +293,7 @@ class Graph:
         for i in range(self.ROW):
             for j in range(self.COL):
                 if visited[i][j] == False and self.graph[i][j] == value:
+                    centerRF = [i, j]
                     islandCenters.append(centerRF)
                     islandSize.append(1)
                     self.DFS(i, j, visited, islandCenters, islandSize, value, index)
