@@ -68,114 +68,108 @@ class Controller:
 
         return pShape, attachedChC
 
-    # def extractEncodedFeatures(self, input_array=pShape, ChCs=attachedChC):
-    #     encodedFeatures = {}
-    #     centerRF = [pShape.shape[0]/2, pShape.shape[1]/2]
-    #     filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
-    #     informationPresent = True
-    #     dynamicStride = self.REC_FLD_LENGTH
-    #     lgth = self.REC_FLD_LENGTH
-    #     directionToExpand = ['LT_UP', 'LT_DOWN', 'RT_UP', 'RT_DOWN']
-    #     directionToAdvance = ['LT', 'RT', 'UP', 'DOWN']
-    #
-    #     ######### need to either expand receptive field or move it around and reset
-    #
-    #     while informationPresent:
-    #         encoding = self.applyReceptiveField(input_array, centerRF, filter,
-    #                                             attachedChC)
-    #         encodedFeatures[centerRF] = [lgth, encoding]
-    #         stepDirection = directionToExpand.pop(0)
-    #         directionToExpand.append(stepDirection) # recycle choice at end of list
-    #         centerRF = self.moveCenterRF(centerRF, stepDirection)
-    #         nextEncoding = self.applyReceptiveField(input_array, centerRF,
-    #                                                 filter, attachedChC)
-    #         if nextEncoding == encoding:
-    #             wd =pass##############
-    #
-    #     return
+    def extractEncodedFeatures(self, input_array, ChCs):
+        encodedFeatures = {}
+        binaryPieces = self.extractBinaryPieces(input_array=pShape, ChCs=attachedChC)
+        intValuesFromBin = set(binaryPieces.values()[0])
 
 
-    def applyReceptiveField(input_array, centerRF, filter, attachedChC,
-                            lgth=4, dynamicThreshold=False):
+        encodedFeatures[centerRF] = [length, encoding]
+        # encoding = self.enc.build_Encoding(binaryInputPiece)
+        pass
+
+    def extractBinaryPieces(self, input_array, ChCs):
+        binaryPieces = {}
+        filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
+        length = self.REC_FLD_LENGTH
+
+
+        for i in range(pShape.shape[0]-length):
+            for j in range(pShape.shape[1]-length):
+                cornerStart = (i, j)
+                centerRF = self.calcCenterRF(cornerStart, pShape.shape[0],
+                                             pShape.shape[1])
+                binaryInputPiece = self.applyReceptiveField(input_array,
+                                                            cornerStart, filter,
+                                                            attachedChC)
+                bin1D = binaryInputPiece.copy().flatten()
+                intValFromBin = bin1D.dot(2**np.arange(bin1D.size)[::-1])
+
+                binaryPieces[centerRF] = [intValFromBin, binaryInputPiece]
+
+        return binaryPieces
+
+
+
+    def applyReceptiveField(input_array, cornerStart, filter, attachedChC,
+                            length=4, dynamicThreshold=False, threshold=None):
         '''centerRF is point in the input space designating upper left corner of the
         receptive field.  Receptive field length represents the size of the
         receptive field.  Function returns an array of the same size as the
         receptive field filtered by the threshold set from the connected chandelier
         cell weights.'''
 
-        start_x, start_y = self.findCornerStart(centerRF, input_array)
+        start_x, start_y = cornerStart
 
-        avgInputValInRF = np.average(input_array[start_x:lgth, start_y:lgth])
+        avgInputValInRF = np.average(input_array[start_x:length, start_y:length])
         if dynamicThreshold:
             threshold = avgInputValInRF/filter
-        else:
+        if not threshold:
             threshold = 0
-        result = np.zeros([lgth, lgth])
-        for i in range(start_x, start_x+lgth):
-            for j in range(start_y, start_y+lgth):
+
+        result = np.zeros([length, length])
+        for i in range(start_x, start_x+length):
+            for j in range(start_y, start_y+length):
                 weight = attachedChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
                 result[i, j] = max(input_array[(i,j)] - filter*weight, 0)
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
-        encoding = self.enc.build_Encoding(binaryInputPiece)
+        return binaryInputPiece
+        # encoding = self.enc.build_Encoding(binaryInputPiece)
 
 
-    def findCornerStart(centerRF, pShape):
+    def calcCenterRF(cornerStart, ht, wd):
         '''Helper function to find start indices for upper left corner of a
         receptive field.
 
         Inputs:
-        centerRF - list of 2 float values corresponding to the x, y center of
-                   the RF
+        cornerStart - list of 2 float values corresponding to the x, y starting
+                      positions of the receptive field
 
         Returns:
-        start_x, start_y - integer values corresponding to upper left corner
+        centerRF - x,y integer values corresponding to center of receptive field
         '''
 
         if self.REC_FLD_LENGTH%2 == 0:
-            start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH/2)
-            start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH/2)
+            center_x = conrnerStart[0]+self.REC_FLD_LENGTH/2 - 1
+            center_y = conrnerStart[1]+self.REC_FLD_LENGTH/2 - 1
         else:
-            start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH//2)
-            start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH//2)
+            center_x = conrnerStart[0]+self.REC_FLD_LENGTH//2
+            center_y = conrnerStart[1]+self.REC_FLD_LENGTH//2
 
-        # check if receptive field falls off input space and backup if so
-        if start_x > pShape.shape[0]-self.REC_FLD_LENGTH:
-            start_x = pShape.shape[0]-self.REC_FLD_LENGTH
-        if start_y > pShape.shape[1]-self.REC_FLD_LENGTH:
-            start_y = pShape.shape[0]-self.REC_FLD_LENGTH
+        return [center_x, center_y]
 
-        return start_x, start_y
+        # if self.REC_FLD_LENGTH%2 == 0:
+        #     start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH/2)
+        #     start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH/2)
+        # else:
+        #     start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH//2)
+        #     start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH//2)
+
+        # # check if receptive field falls off input space and adjust
+        # if start_x < 0:
+        #     start_x = 0
+        # if start_y < 0:
+        #     start_y = 0
+        # if start_x > pShape.shape[0]-self.REC_FLD_LENGTH:
+        #     start_x = pShape.shape[0]-self.REC_FLD_LENGTH
+        # if start_y > pShape.shape[1]-self.REC_FLD_LENGTH:
+        #     start_y = pShape.shape[0]-self.REC_FLD_LENGTH
+        #
+        # return start_x, start_y
 
 
-    def moveCenterRF(centerRF, stepDirection):
-        ''' Helper function to the receptive field center point to new location.
 
-        Inputs:
-        centerRF - list of 2 float values corresponding to the x, y center of
-                   the RF
-        stepDirection - string indicating one of 8 cardinal directions
-
-        Returns:
-        newCenterRF - list of 2 float values corresponding to new x, y center
-        '''
-
-        if stepDirection == 'LT_UP':
-            if centerRF[0]%2 == 0:
-                lgth += 1
-            centerRF[0] = centerRF[0]-self.REC_FLD_LENGTH
-            centerRF[1] = centerRF[1]-self.REC_FLD_LENGTH
-        if stepDirection == 'LT_DOWN':
-            centerRF[0] = centerRF[0]-self.REC_FLD_LENGTH
-            centerRF[1] = centerRF[1]+self.REC_FLD_LENGTH
-        if stepDirection == 'RT_UP':
-            centerRF[0] = centerRF[0]+self.REC_FLD_LENGTH
-            centerRF[1] = centerRF[1]-self.REC_FLD_LENGTH
-        if stepDirection == 'RT_DOWN':
-            centerRF[0] = centerRF[0]+self.REC_FLD_LENGTH
-            centerRF[1] = centerRF[1]+self.REC_FLD_LENGTH
-
-        return centerRF
 
 
 
@@ -196,15 +190,16 @@ class Controller:
 class Graph:
 
     def __repr__(self):
-        return (f'''This class implements an object to count the number of
+        return (f'''This class implements an object to index the number of
         connected components in an undirected graph (islands in 2D array).''')
 
     def __init__(self, row, col, g):
         self.ROW = row
         self.COL = col
         self.graph = g
+        self.islandDict = {}
 
-    def isSafe(self, i, j, visited):
+    def isSafe(self, i, j, visited, value):
         '''Function to check if a given cell (row, col) can be included in the
         depth first search (DFS) recursive function.
 
@@ -217,15 +212,23 @@ class Graph:
         '''
 
         return (i>=0 and i<self.ROW and j>=0 and j<self.COL
-                and not visited[i][j] and self.graph[i][j])
+                and not visited[i][j] and self.graph[i][j] == value)
 
-    def DFS(self, i, j, visited):
+    def DFS(self, i, j, visited, islandCenters, islandSize, value, index):
         '''Depth first search for 4 adjacent neighbors
 
         Inputs:
         i, j - Integers representing row, col position in 2D array
         visited - boolean array of same dimensions as graph for whether cell has been checked
+        islandCenters - list of centerRF for each connected component
+        islandSize - list of integers corresponding to the size of each island
+        value - integer value that is target value for connected components.
+        index - integer value that represents which island is being explored
+
         '''
+
+        centerRF = islandCenters[index]
+        islSize = islandSize[index]
 
         rowNbr = [-1, 0, 0, 1]
         colNbr = [0, -1, 1, 0]
@@ -233,24 +236,68 @@ class Graph:
         visited[i][j] = True
 
         for k in range(4):
-            if self.isSafe(i + rowNbr[k], j + colNbr[k], visited):
-                self.DFS(i + rowNbr[k], j + colNbr[k], visited)
+            # new x, y cell to try
+            x, y = i + rowNbr[k], j + colNbr[k]
+            if self.isSafe(x, y, visited, value):
+                islSize += 1
+                centerRF = self.calcMovingAvgCenterRF(islSize, centerRF, x, y)
+                print('value', value)
+                print(centerRF)
+                islandCenters[index] = centerRF
+                islandSize[index] = islSize
+                self.islandDict[value].update({'islandCenters': islandCenters,
+                                               'islandSize': islandSize})
+                self.DFS(x, y, visited, islandCenters, islandSize, value, index)
 
-    def countIslands(self):
+        return
+
+    def calcMovingAvgCenterRF(self, islandSize, centerRF, x, y):
+        '''Function to update the coordinates (centerRF) of a particular island.
+
+        Inputs:
+        islandSize - Integer value used for normalization
+        centerRF - integers representing current x, y position
+        x, y - integers representing added component to island.
+
+        Returns:
+        centerRF - integers updated to center point.
+        '''
+
+        centerRF[0] = (centerRF[0]*(islandSize-1)+x)/islandSize
+        centerRF[1] = (centerRF[1]*(islandSize-1)+y)/islandSize
+
+        return centerRF
+
+    def countIslands(self, value, centerRF):
         '''Main function which creates a boolean array of visited cells and
         counts number of connected components.
 
+        Inputs:
+        value - integer value that is present in the graph
+        centerRF - x, y integers corresponding to center of first island.
+
         Returns:
-        count - Integer number of connected components
+        self.islandDict - nested dictionary with top level key corresponding to
+                          each binary_to_integer value which refers to an inner
+                          dictionary that contains a list of centerRFs for each
+                          connected component along with the number of elements
+                          in that connected component.
         '''
 
+
+        islandCenters = []
+        islandSize = []
+        self.islandDict[value] = {'islandCenters': islandCenters,
+                                  'islandSize': islandSize}
         visited = [[False for j in range(self.COL)] for i in range(self.ROW)]
 
-        count = 0
+        index = 0
         for i in range(self.ROW):
             for j in range(self.COL):
-                if visited[i][j] == False and self.graph[i][j] == 1:
-                    self.DFS(i, j, visited)
-                    count += 1
+                if visited[i][j] == False and self.graph[i][j] == value:
+                    islandCenters.append(centerRF)
+                    islandSize.append(1)
+                    self.DFS(i, j, visited, islandCenters, islandSize, value, index)
+                    index += 1
 
-        return count
+        return
