@@ -17,6 +17,12 @@ class TestEncoder(unittest.TestCase):
                       [3, 3, 3, 1, 0],
                       [1, 3, 1, 0, 1]]
 
+        self.perim = [[1, 1, 1, 1, 1],
+                      [1, 0, 0, 0, 1],
+                      [1, 0, 2, 0, 1],
+                      [1, 0, 0, 0, 1],
+                      [1, 1, 1, 1, 1]]
+
     def test_countIslands(self):
         row = len(self.graph)
         col = len(self.graph)
@@ -42,6 +48,18 @@ class TestEncoder(unittest.TestCase):
         assert g.islandDict[3]['islandCenters'] == [[1, 2], [3.0, 1.0]]
         assert g.islandDict[3]['islandSize'] == [1, 5]
 
+        p = Graph(row, col, self.perim)
+        for value in range(3):
+            p.countIslands(value)
+        print('''note problem with centerRF bc with perimeter it puts center
+                inside at location where actual value is something else''')
+        pprint(p.islandDict)
+
+    def test_me(self):
+        tester = {'a': 1, 'b': 2, 'c': 5}
+        print(sum(tester.values()))
+        list(tester.values())/sum(tester.value())
+        print(tester.values())
 
 if __name__ == '__main__':
     unittest.main()

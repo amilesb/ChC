@@ -8,6 +8,7 @@ import pickle
 from ChC import ChC
 from Encoder import Encoder
 from Polygon import Polygon
+from Spatial_Pooler import Spatial_Pooler
 
 
 
@@ -17,11 +18,9 @@ class Controller:
         return (f'''This class implements a handler to process an input and
         coordinate handoff(s) between other objects.''')
 
-    def __init__(self, spatialPooler, sequencer, encoder, input_array):
+    def __init__(self, encoder, input_array):
         ''''''
-        self.sp = spatialPooler
-        self.seq = sequencer
-        self.encoder = encoder
+        self.encoder = Encoder()
         self.input_array = input_array
 
         ## use ChC total synapse weight to apply threshold filter to input
@@ -29,6 +28,30 @@ class Controller:
         stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         num_receptive_fields = stride**2 # 1024
         self.enc = Encoder()
+
+    def processInput(self, objectToTrain):
+        # input sys arg inputs and process
+
+        pShape, attachedChC = self.buildPolygonAndAttachChC()
+        binaryPieces, salience = self.extractPieces(pShape, attachedChC)
+        firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0])
+        sp = Spatial_Pooler(firstInputPiece)
+        seq = Sequencer(sp)
+
+        if objectToTrain == 'sp':
+            self.trainSP(sp, binaryPieces)
+        if objectToTrain == 'seq':
+            self.trainSeq()
+        elif objectToTrain == 'topo':
+            self.trainTopo()
+
+
+        # should i trian sp first and then sequencer or do both toegether
+
+
+
+    encodedFeatures[centerRF] = [length, encoding]
+    # encoding = self.enc.build_Encoding(binaryInputPiece)
 
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
                                  y=4, wd=4, ht=3, angle=0):
@@ -68,18 +91,10 @@ class Controller:
 
         return pShape, attachedChC
 
-    def extractEncodedFeatures(self, input_array, ChCs):
-        encodedFeatures = {}
-        binaryPieces = self.extractBinaryPieces(input_array=pShape, ChCs=attachedChC)
-        intValuesFromBin = set(binaryPieces.values()[0])
 
-
-        encodedFeatures[centerRF] = [length, encoding]
-        # encoding = self.enc.build_Encoding(binaryInputPiece)
-        pass
-
-    def extractBinaryPieces(self, input_array, ChCs):
+    def extractPieces(self, input_array, ChCs):
         binaryPieces = {}
+        intValArray = np.zeros(pShape.shape[0]-length, pShape.shape[1]-length)
         filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
         length = self.REC_FLD_LENGTH
 
@@ -94,11 +109,26 @@ class Controller:
                                                             attachedChC)
                 bin1D = binaryInputPiece.copy().flatten()
                 intValFromBin = bin1D.dot(2**np.arange(bin1D.size)[::-1])
+                intValArray[i][j] = intValFromBin
 
-                binaryPieces[centerRF] = [intValFromBin, binaryInputPiece]
+                binaryPieces[centerRF] = binaryInputPiece
 
-        return binaryPieces
+        connectedGraph = self.findConnectedComponents(intValArray)
 
+        salience = self.calcSalience(connectedGraph, intValArray, binaryPieces)
+
+        return binaryPieces, salience
+
+
+    def findConnectedComponents(self, intValArray):
+
+        intValuesFromBin = set(np.unique(intValArray))
+
+        g = Graph(intValArray.shape[0], intValArray.shape[1], intValArray)
+        for value in intValuesFromBin:
+            g.countIslands(value)
+
+        return g
 
 
     def applyReceptiveField(input_array, cornerStart, filter, attachedChC,
@@ -125,7 +155,6 @@ class Controller:
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
         return binaryInputPiece
-        # encoding = self.enc.build_Encoding(binaryInputPiece)
 
 
     def calcCenterRF(cornerStart, ht, wd):
@@ -149,43 +178,56 @@ class Controller:
 
         return [center_x, center_y]
 
-        # if self.REC_FLD_LENGTH%2 == 0:
-        #     start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH/2)
-        #     start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH/2)
-        # else:
-        #     start_x = pShape.shape[0]-centerRF-(1+self.REC_FLD_LENGTH//2)
-        #     start_y = pShape.shape[1]-centerRF-(1+self.REC_FLD_LENGTH//2)
 
-        # # check if receptive field falls off input space and adjust
-        # if start_x < 0:
-        #     start_x = 0
-        # if start_y < 0:
-        #     start_y = 0
-        # if start_x > pShape.shape[0]-self.REC_FLD_LENGTH:
-        #     start_x = pShape.shape[0]-self.REC_FLD_LENGTH
-        # if start_y > pShape.shape[1]-self.REC_FLD_LENGTH:
-        #     start_y = pShape.shape[0]-self.REC_FLD_LENGTH
-        #
-        # return start_x, start_y
+    def calcSalience(self, g, intValArray, binaryPieces, strength=0.1):
+        '''Calculate a salience score for each thresoholded binary input piece.
+
+        Inputs:
+        g             -- Graph object that analyzes how many connected
+                         components are present in the input space.
+        intValArray   -- Array corresponding to compression of binary input pieces
+                        into single decimal value.
+        binaryPieces  -- dictionary with centerRFs as keys and values binary
+                         arrays with size equal to the receptive field length
+        strength      -- value that controls how much to boost isolated components
+                         versus different connected components based upon a
+                         gaussian redistribution that favors less connected
+                         components (i.e. unique inputs).
+                         Note: strength of 0 treats all inputs the same; default=0.1
 
 
+        Returns:
+        salience -- dictionary with keys equal to centerRFs and values the
+                    salience score for that binary piece
+        '''
+
+        salience = {}
+        maxConnected = 1
+
+        for intVal in set(np.unique(intValArray)):
+            maxConnectedComp = max(g.islandDict[intVal]['islandSize'])
+            if maxConnectedComp > maxConnected:
+                maxConnected = maxConnectedComp
+
+        index = 0
+        for centerRF in list(binaryPieces.keys()):
+            intVal = intValArray[index]
+            connectedList = g.islandDict[intVal]['islandSize']
+            connectedVal = connectedList.pop(0)
+
+            rawSal = 1/(connectedVal * connectedValintValArray.size)
+            P = np.exp(-strength*connectedVal/maxConnected)
+
+            salience[centerRF] = P*rawSal
+
+            index+=1
+
+        total = sum(salience.itervalues(), 0)
+        binaryPieces = {k: v/total for k, v in salience.iteritems()}
+
+        return salience
 
 
-
-
-
-
-# build SDR from encoding!
-
-
-
-
-
-
-
-## create a 4x4 reeceptive field and pass into encoder to create SDR for each receptive field.
-## also need to calculate interference within receptive field to compute output weights
-## pass output to spatial pooler
 
 class Graph:
 
@@ -213,6 +255,7 @@ class Graph:
 
         return (i>=0 and i<self.ROW and j>=0 and j<self.COL
                 and not visited[i][j] and self.graph[i][j] == value)
+
 
     def DFS(self, i, j, visited, islandCenters, islandSize, value, index):
         '''Depth first search for 4 adjacent neighbors
@@ -249,6 +292,7 @@ class Graph:
 
         return
 
+
     def calcMovingAvgCenterRF(self, islandSize, centerRF, x, y):
         '''Function to update the coordinates (centerRF) of a particular island.
 
@@ -265,6 +309,7 @@ class Graph:
         centerRF[1] = (centerRF[1]*(islandSize-1)+y)/islandSize
 
         return centerRF
+
 
     def countIslands(self, value):
         '''Main function which creates a boolean array of visited cells and
@@ -300,3 +345,14 @@ class Graph:
                     index += 1
 
         return
+
+
+
+
+# build SDR from encoding!
+
+
+
+## create a 4x4 reeceptive field and pass into encoder to create SDR for each receptive field.
+## also need to calculate interference within receptive field to compute output weights
+## pass output to spatial pooler
