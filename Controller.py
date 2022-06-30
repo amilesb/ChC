@@ -18,40 +18,66 @@ class Controller:
         return (f'''This class implements a handler to process an input and
         coordinate handoff(s) between other objects.''')
 
-    def __init__(self, encoder, input_array):
+    def __init__(self):#, encoder, input_array):
         ''''''
-        self.encoder = Encoder()
-        self.input_array = input_array
+        # self.encoder = Encoder()
+        # self.input_array = input_array
 
         ## use ChC total synapse weight to apply threshold filter to input
-        self.REC_FLD_LENGTH = 4
-        stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
-        num_receptive_fields = stride**2 # 1024
-        self.enc = Encoder()
+        # self.REC_FLD_LENGTH = 4
+        # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
+        # num_receptive_fields = stride**2 # 1024
+        pass
 
-    def processInput(self, objectToTrain):
+    def processInput(self, objectToTrain, **kwargs):
+        ''' Top level function to take an input and run through the network.
+
+        Inputs:
+        objectToTrain - string identifier to determine what logic to run
+        **kwargs      - dictionary with pShape, attachedChC, self.sp, self.seq
+                        and self.topo passed in if already defined else created
+                        in main function
+
+        Returns:
+        None
+        '''
+
         # input sys arg inputs and process
 
-        pShape, attachedChC = self.buildPolygonAndAttachChC()
+        if not pShape or not attachedChC:
+            pShape, attachedChC = self.buildPolygonAndAttachChC()
         binaryPieces, salience = self.extractPieces(pShape, attachedChC)
-        firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0])
-        sp = Spatial_Pooler(firstInputPiece)
-        seq = Sequencer(sp)
+
+
+
+        if not self.sp:
+            firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0])
+            self.sp = Spatial_Pooler(len(firstInputPiece))
+        if not self.seq:
+            self.seq = Sequencer(self.sp)
+
+        ##########################
+        print('need logic to create metric to determine if sp has settled and/or seq')
+
+## also need to calculate interference within receptive field to compute output weights
+
+
+
+        ###########################
+        keyToTrainOn = np.random.choice(list(salience.keys()), replace=True,
+                                        p=list(salience.value()))
+        spInput = self.encoder.build_Encoding(binaryPieces[keyToTrainOn])
+
+        overlapScore = self.sp.computeOverlap(currentInput=spInput)
+        winningColumnsInd = self.sp.computeWinningCOlumns(overlapScore)
 
         if objectToTrain == 'sp':
-            self.trainSP(sp, binaryPieces)
+            self.sp.updateSynapseParameters(winningColumnsInd, overlapScore, spInput)
         if objectToTrain == 'seq':
-            self.trainSeq()
+            self.seq.evalActiveColsVersusPreds(winningColumnsInd)
         elif objectToTrain == 'topo':
             self.trainTopo()
 
-
-        # should i trian sp first and then sequencer or do both toegether
-
-
-
-    encodedFeatures[centerRF] = [length, encoding]
-    # encoding = self.enc.build_Encoding(binaryInputPiece)
 
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
                                  y=4, wd=4, ht=3, angle=0):
@@ -69,30 +95,47 @@ class Controller:
         pShape: numpy array with specified shape perimeter defined within
         attachedChC: dictionary which maps chandelier cells to the input_array
         '''
-        pShape = Polygon(array_size=array_size, form=form, x=x, y=y, wd=wd,
-                        ht=ht, angle=angle)
+        pShape = Polygon(array_size=array_size, form=form, x=x, y=y, width=wd,
+                         height=ht, angle=angle)
 
         # pShape = Polygon(array_size=array_size, form='rectangle', x=125, y=125, wd=40,
         #                     ht=30, angle = 0)
         pShape.insert_Polygon()
 
-        pShape.display_Polygon(pShape.input_array, angle=pShape.angle)
+        # pShape.display_Polygon(pShape.input_array, angle=pShape.angle)
 
-        if os.path.exists(f'ChC_size_{array_size}'):
-            with open(f'ChC_size_{array_size}', 'rb') as dicts_handle:
-                (ChC_dict, pyc_dict) = pickle.load(dicts_handle)
+        if os.path.exists(f'ChC_handles/ChC_size_{array_size}'):
+            with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
+                attachedChC = pickle.load(ChC_handle)
         else:
             attachedChC = ChC(pShape)
             ChC_dict, pyc_dict = attachedChC.attach_ChC_Coords(debug=False)
             attachedChC.sort_ChC()
             attachedChC.sort_PyC()
-            with open(f'ChC_size_{array_size}', 'wb') as dicts_handle:
-                pickle.dump((ChC_dict, pyc_dict), dicts_handle)
+            with open(f'ChC_handles/ChC_size_{array_size}', 'wb') as ChC_handle:
+                pickle.dump(attachedChC, ChC_handle)
 
         return pShape, attachedChC
 
 
     def extractPieces(self, input_array, ChCs):
+        '''Process a Polygon object to pass a filter with receptive field
+        defined below (length) and extract filtered pieces after striding across
+        entire image.
+
+        Inputs:
+        input_array - Polygon object which essentially is a numpy array
+                      representing a grayscale image with polygon inserted
+        ChCs        - ChC object representing map of polygon object coordinates
+                      to connected chandelier cells
+
+        returns:
+        binaryPieces - dictionary with center of the receptive field as key and
+                       2D binary array generated from applied filter as the
+                       corresponding values
+        salience     - dicitonary with center of the receptive field as key and
+                       a salience score as the values.
+        '''
         binaryPieces = {}
         intValArray = np.zeros(pShape.shape[0]-length, pShape.shape[1]-length)
         filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
@@ -121,7 +164,19 @@ class Controller:
 
 
     def findConnectedComponents(self, intValArray):
+        '''Search through the values obtained from applying a receptive field
+        and identify idnetical values are neighbors to one another in the input
+        space.
 
+        Inputs:
+        intValArray - array with the integer representation of a 2d binary array
+
+        Returns:
+        g           - graph object which stores a dictionary called 'islandDict'
+                      with the integer representation(s) as the key(s) and size
+                      of connected components as the values.
+
+        '''
         intValuesFromBin = set(np.unique(intValArray))
 
         g = Graph(intValArray.shape[0], intValArray.shape[1], intValArray)
@@ -222,10 +277,13 @@ class Controller:
 
             index+=1
 
-        total = sum(salience.itervalues(), 0)
-        binaryPieces = {k: v/total for k, v in salience.iteritems()}
+        total = sum(salience.values(), 0)
+        salience = {k: v/total for k, v in salience.items()}
 
         return salience
+
+
+
 
 
 
@@ -345,14 +403,3 @@ class Graph:
                     index += 1
 
         return
-
-
-
-
-# build SDR from encoding!
-
-
-
-## create a 4x4 reeceptive field and pass into encoder to create SDR for each receptive field.
-## also need to calculate interference within receptive field to compute output weights
-## pass output to spatial pooler

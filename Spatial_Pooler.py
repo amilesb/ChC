@@ -100,7 +100,7 @@ class Spatial_Pooler:
 
         return subset
 
-    def computeWinningCOlumns(self, overlapScore, stimulusT=8, numW=40):  # stimulusT = self.stimulusThreshold; numW = self.numActiveColumnsPerInhArea
+    def computeWinningCOlumns(self, overlapScore, stimulusT=8, numW=40):  # defaults: stimulusT = self.stimulusThreshold; numW = self.numActiveColumnsPerInhArea
         '''Inputs a list of each mini-column's overlap with the input space and
         ranks each mini-column.  Ties are broken pseudorandomly and a list with
         the mini-columns with greatest overlap is returned.'''
