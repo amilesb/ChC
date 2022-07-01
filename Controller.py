@@ -24,7 +24,7 @@ class Controller:
         # self.input_array = input_array
 
         ## use ChC total synapse weight to apply threshold filter to input
-        # self.REC_FLD_LENGTH = 4
+        self.REC_FLD_LENGTH = 4
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
         pass
@@ -137,19 +137,21 @@ class Controller:
                        a salience score as the values.
         '''
         binaryPieces = {}
-        intValArray = np.zeros(pShape.shape[0]-length, pShape.shape[1]-length)
-        filter = pShape.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
         length = self.REC_FLD_LENGTH
+        s = (input_array.shape[0]-length, input_array.shape[1]-length)
+
+        intValArray = np.zeros(s)
+        # filter = input_array.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
+        filter = np.amax(input_array)/ChCs.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
 
-        for i in range(pShape.shape[0]-length):
-            for j in range(pShape.shape[1]-length):
-                cornerStart = (i, j)
-                centerRF = self.calcCenterRF(cornerStart, pShape.shape[0],
-                                             pShape.shape[1])
+        for i in range(s[0]):
+            for j in range(s[1]):
+                cornerStart = i, j
+                centerRF = self.calcCenterRF(cornerStart)
                 binaryInputPiece = self.applyReceptiveField(input_array,
                                                             cornerStart, filter,
-                                                            attachedChC)
+                                                            ChCs)
                 bin1D = binaryInputPiece.copy().flatten()
                 intValFromBin = bin1D.dot(2**np.arange(bin1D.size)[::-1])
                 intValArray[i][j] = intValFromBin
@@ -186,17 +188,29 @@ class Controller:
         return g
 
 
-    def applyReceptiveField(input_array, cornerStart, filter, attachedChC,
+    def applyReceptiveField(self, input_array, cornerStart, filter, attachedChC,
                             length=4, dynamicThreshold=False, threshold=None):
-        '''centerRF is point in the input space designating upper left corner of the
-        receptive field.  Receptive field length represents the size of the
-        receptive field.  Function returns an array of the same size as the
-        receptive field filtered by the threshold set from the connected chandelier
-        cell weights.'''
+        ''' Function returns an array of the same size as the receptive field
+        filtered by the threshold set from the connected chandelier cell weights.
 
+        Inputs:
+        input_array      - Polygon object which essentially is a numpy array
+                           representing a grayscale image with polygon inserted
+        cornerStart      - x, y integer coordinates for corresponding array indices
+        filter           - float value which sets dynamic range of input values
+        attachedChC      - ChC object representing map of polygon object coordinates
+                           to connected chandelier cells
+        length           - square receptive field size
+        dynamicThreshold - boolean
+        threshold        - float value to compare against filtered input
+
+        Returns:
+        binaryInputPiece - binary 2D numpy array of dimensions length x length
+        '''
         start_x, start_y = cornerStart
 
-        avgInputValInRF = np.average(input_array[start_x:length, start_y:length])
+        avgInputValInRF = np.mean(input_array[start_x:start_x+length,
+                                              start_y:start_y+length])
         if dynamicThreshold:
             threshold = avgInputValInRF/filter
         if not threshold:
@@ -205,14 +219,14 @@ class Controller:
         result = np.zeros([length, length])
         for i in range(start_x, start_x+length):
             for j in range(start_y, start_y+length):
-                weight = attachedChC.total_Synapse_Weight(self, PyC_array_element=(i,j))
-                result[i, j] = max(input_array[(i,j)] - filter*weight, 0)
+                weight = attachedChC.total_Synapse_Weight(PyC_array_element=(i,j))
+                result[i-start_x, j-start_y] = max(input_array[(i,j)] - filter*weight, 0)
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
         return binaryInputPiece
 
 
-    def calcCenterRF(cornerStart, ht, wd):
+    def calcCenterRF(self, cornerStart):
         '''Helper function to find start indices for upper left corner of a
         receptive field.
 
@@ -225,13 +239,13 @@ class Controller:
         '''
 
         if self.REC_FLD_LENGTH%2 == 0:
-            center_x = conrnerStart[0]+self.REC_FLD_LENGTH/2 - 1
-            center_y = conrnerStart[1]+self.REC_FLD_LENGTH/2 - 1
+            center_x = cornerStart[0]+self.REC_FLD_LENGTH/2 - 1
+            center_y = cornerStart[1]+self.REC_FLD_LENGTH/2 - 1
         else:
-            center_x = conrnerStart[0]+self.REC_FLD_LENGTH//2
-            center_y = conrnerStart[1]+self.REC_FLD_LENGTH//2
+            center_x = cornerStart[0]+self.REC_FLD_LENGTH//2
+            center_y = cornerStart[1]+self.REC_FLD_LENGTH//2
 
-        return [center_x, center_y]
+        return (center_x, center_y)
 
 
     def calcSalience(self, g, intValArray, binaryPieces, strength=0.1):
