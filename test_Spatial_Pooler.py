@@ -54,7 +54,7 @@ class TestSpatialPooler(unittest.TestCase):
         subset = Spatial_Pooler.computeConnectedSynapses(self.sp, self.simpleSynapseDict)
         assert len(subset) == 400
 
-    def testComputeWinningCOlumns(self):
+    def testComputeWinningColumns(self):
         overlapScore = [i+j for i in range(20) for j in range(20)]
         winners = [239, 278, 298, 297, 392, 393, 394, 279, 356, 355, 354, 353,
                    315, 373, 374, 375, 316, 317, 318, 395, 334, 259, 335, 336,

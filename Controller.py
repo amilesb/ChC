@@ -4,6 +4,7 @@ the actual experiments.'''
 import numpy as np
 import os.path
 import pickle
+import scipy.stats as stats
 
 from ChC import ChC
 from Encoder import Encoder
@@ -25,6 +26,7 @@ class Controller:
 
         ## use ChC total synapse weight to apply threshold filter to input
         self.REC_FLD_LENGTH = 4
+        self.maxFiringRateOutput = 255
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
         pass
@@ -49,7 +51,6 @@ class Controller:
         binaryPieces, salience = self.extractPieces(pShape, attachedChC)
 
 
-
         if not self.sp:
             firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0])
             self.sp = Spatial_Pooler(len(firstInputPiece))
@@ -61,22 +62,27 @@ class Controller:
 
 ## also need to calculate interference within receptive field to compute output weights
 
-
-
         ###########################
-        keyToTrainOn = np.random.choice(list(salience.keys()), replace=True,
-                                        p=list(salience.value()))
-        spInput = self.encoder.build_Encoding(binaryPieces[keyToTrainOn])
+        STOP = False
+        counter = 0
+        while not STOP or counter < 40000:
+            keyToTrainOn = np.random.choice(list(salience.keys()), replace=True,
+                                            p=list(salience.value()))
+            spInput = self.encoder.build_Encoding(binaryPieces[keyToTrainOn])
+            overlapScore = self.sp.computeOverlap(currentInput=spInput)
+            winningColumnsInd = self.sp.computeWinningColumns(overlapScore)
 
-        overlapScore = self.sp.computeOverlap(currentInput=spInput)
-        winningColumnsInd = self.sp.computeWinningCOlumns(overlapScore)
+            if objectToTrain == 'sp':
+                self.sp.updateSynapseParameters(winningColumnsInd, overlapScore,
+                                                spInput)
+            if objectToTrain == 'seq':
+                self.seq.evalActiveColsVersusPreds(winningColumnsInd)
+            elif objectToTrain == 'topo':
+                self.trainTopo()
 
-        if objectToTrain == 'sp':
-            self.sp.updateSynapseParameters(winningColumnsInd, overlapScore, spInput)
-        if objectToTrain == 'seq':
-            self.seq.evalActiveColsVersusPreds(winningColumnsInd)
-        elif objectToTrain == 'topo':
-            self.trainTopo()
+            counter += 1
+
+
 
 
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
@@ -141,7 +147,6 @@ class Controller:
         s = (input_array.shape[0]-length, input_array.shape[1]-length)
 
         intValArray = np.zeros(s)
-        # filter = input_array.MAX_INPUT/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT #default 255/40
         filter = np.amax(input_array)/ChCs.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
 
@@ -154,7 +159,7 @@ class Controller:
                                                             ChCs)
                 bin1D = binaryInputPiece.copy().flatten()
                 intValFromBin = bin1D.dot(2**np.arange(bin1D.size)[::-1])
-                intValArray[i][j] = intValFromBin
+                intValArray[i, j] = intValFromBin
 
                 binaryPieces[centerRF] = binaryInputPiece
 
@@ -223,7 +228,36 @@ class Controller:
                 result[i-start_x, j-start_y] = max(input_array[(i,j)] - filter*weight, 0)
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
-        return binaryInputPiece
+        firingRateOutput = self.calcInterference(result, threshold)
+
+        return binaryInputPiece, firingRateOutput
+
+
+    def calcInterference(self, result, threshold):
+        '''Examine values within receptive field and calculate interference to
+        determine how confident receptive field filter is.
+
+        Inputs:
+        result - numpy square array with length equal to receptive field and
+                 values corresponding to input values after chandelier cell filtration.
+        threshold - scalar threshold value
+
+        Returns:
+        firingRateOutput - Scalar value representing strength of output (input
+                           to next hierarchical layer)
+        '''
+        aboveThresh = np.where(result > threshold, result, 0)
+        aboveThresh = np.reshape(aboveThresh, -1)
+        aboveThresh = aboveThresh[aboveThresh!=0]
+
+        belowThresh = np.where(result <= threshold, result, 0)
+        belowThresh = np.reshape(belowThresh, -1)
+        belowThresh = belowThresh[belowThresh!=0]
+
+        uValue, pValue = stats.wilcoxon(aboveThresh, belowThresh)
+
+        # key concept in wilcoxon rank sum test uValue ranges from 0 (= complete sepatation) to n1*n2 (= no separation) where n1 and n2 are number of samples from each distribution (here size of receptive field).  Note, bc of the threshold splitting above and below the uValue will be zero.  The pValue though tells the probability that this is true.
+        return min(1/pValue, self.maxFiringRateOutput)
 
 
     def calcCenterRF(self, cornerStart):
@@ -250,6 +284,8 @@ class Controller:
 
     def calcSalience(self, g, intValArray, binaryPieces, strength=0.1):
         '''Calculate a salience score for each thresoholded binary input piece.
+        NOTE: This is a soft surrogate that bluntly serves as a spatial low
+        pass filter i.e. increases salience of non repeat elements in input!
 
         Inputs:
         g             -- Graph object that analyzes how many connected
@@ -264,7 +300,6 @@ class Controller:
                          components (i.e. unique inputs).
                          Note: strength of 0 treats all inputs the same; default=0.1
 
-
         Returns:
         salience -- dictionary with keys equal to centerRFs and values the
                     salience score for that binary piece
@@ -272,24 +307,22 @@ class Controller:
 
         salience = {}
         maxConnected = 1
+        flatIntValArray = np.reshape(intValArray, -1)
 
         for intVal in set(np.unique(intValArray)):
             maxConnectedComp = max(g.islandDict[intVal]['islandSize'])
             if maxConnectedComp > maxConnected:
                 maxConnected = maxConnectedComp
 
-        index = 0
-        for centerRF in list(binaryPieces.keys()):
-            intVal = intValArray[index]
+        for index, centerRF in enumerate(list(binaryPieces.keys())):
+            intVal = flatIntValArray[index]
             connectedList = g.islandDict[intVal]['islandSize']
-            connectedVal = connectedList.pop(0)
+            avgConnectedVal = sum(connectedList)/len(connectedList)
 
-            rawSal = 1/(connectedVal * connectedValintValArray.size)
-            P = np.exp(-strength*connectedVal/maxConnected)
+            rawSal = 1/(avgConnectedVal * flatIntValArray.size)
+            P = np.exp(-strength*avgConnectedVal/maxConnected)
 
             salience[centerRF] = P*rawSal
-
-            index+=1
 
         total = sum(salience.values(), 0)
         salience = {k: v/total for k, v in salience.items()}

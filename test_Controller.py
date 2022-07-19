@@ -31,6 +31,7 @@ class TestController(unittest.TestCase):
 
 
     def test_buildPolygonAndAttachChC(self):
+        '''NOTE this test includes an test of calcSalience function.'''
         pShape, attachedChC = self.controller.buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4, y=4, wd=4, ht=3, angle=0)
 
         assert pShape.input_array.size == 100
@@ -38,7 +39,25 @@ class TestController(unittest.TestCase):
 
     def test_extractPieces(self):
         binaryPieces, salience = self.controller.extractPieces(self.intValArray, self.attachedChC)
-        print('bin',binaryPieces)
+
+        assert salience[1.0, 1.0] == 0.03604639149517929
+        assert salience[2.0, 3.0] == 0.011240550342974841
+        assert salience[6.0, 3.0] == 0.03604639149517929
+
+        assert (binaryPieces[1.0, 1.0] == [[0, 0, 0, 0],
+                                           [0, 0, 0, 0],
+                                           [0, 0, 0, 0],
+                                           [0, 1, 0, 0]]).all()
+
+        assert (binaryPieces[2.0, 5.0] == [[0, 1, 1, 1],
+                                           [0, 1, 0, 1],
+                                           [0, 1, 1, 1],
+                                           [0, 1, 1, 1]]).all()
+
+        assert (binaryPieces[3.0, 1.0] == [[0, 0, 0, 0],
+                                           [0, 1, 0, 0],
+                                           [0, 0, 0, 0],
+                                           [0, 0, 0, 0]]).all()
 
 
     def test_findConnectedComponents(self):
@@ -70,15 +89,6 @@ class TestController(unittest.TestCase):
         self.controller.REC_FLD_LENGTH = 5
         centerRF = self.controller.calcCenterRF(self.cornerStart)
         assert centerRF == (2, 7)
-
-
-    def test_calcSalience(self):
-        # g = self.controller.findConnectedComponents(self.intValArray)
-        #
-        # self.controller.calcSalience(g, self.intValArray, binaryPieces)
-        pass
-
-
 
 
 class TestGraph(unittest.TestCase):

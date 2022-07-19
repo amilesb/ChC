@@ -8,7 +8,7 @@ from Encoder import Encoder
 
 
 class Spatial_Pooler:
-    '''The main function interface for this class is the computeWinningCOlumns
+    '''The main function interface for this class is the computeWinningColumns
     function which determines the active mini-columns.  Additionally,
     updateSynapseParameters enables learning in the spatial pooler and should be
     used in tandem.'''
@@ -100,7 +100,7 @@ class Spatial_Pooler:
 
         return subset
 
-    def computeWinningCOlumns(self, overlapScore, stimulusT=8, numW=40):  # defaults: stimulusT = self.stimulusThreshold; numW = self.numActiveColumnsPerInhArea
+    def computeWinningColumns(self, overlapScore, stimulusT=8, numW=40):  # defaults: stimulusT = self.stimulusThreshold; numW = self.numActiveColumnsPerInhArea
         '''Inputs a list of each mini-column's overlap with the input space and
         ranks each mini-column.  Ties are broken pseudorandomly and a list with
         the mini-columns with greatest overlap is returned.'''
