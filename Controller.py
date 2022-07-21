@@ -52,7 +52,9 @@ class Controller:
 
 
         if not self.sp:
-            firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0])
+            firstInputPiece = self.encoder.build_Encoding(len(binaryPieces),
+                                                          list(binaryPieces.values())[0]
+                                                         )
             self.sp = Spatial_Pooler(len(firstInputPiece))
         if not self.seq:
             self.seq = Sequencer(self.sp)
@@ -73,7 +75,8 @@ class Controller:
         centerRF = np.random.choice(list(salience.keys()), replace=True,
                                     p=list(salience.value()))
         # Process through encoder and into the spatial pooler
-        spInput = self.encoder.build_Encoding(binaryPieces[centerRF])
+        spInput = self.encoder.build_Encoding(len(binaryPieces),
+                                              binaryPieces[centerRF])
         overlapScore = self.sp.computeOverlap(currentInput=spInput)
         winningColumnsInd = self.sp.computeWinningColumns(overlapScore)
 

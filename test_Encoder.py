@@ -9,7 +9,7 @@ class TestEncoder(unittest.TestCase):
 
     def setUp(self):
         self.testArray = np.array([[0, 1, 0, 1], [0, 1, 0, 1], [1, 0, 0, 0], [0, 0, 0, 1]])
-        self.encoded = Encoder()
+        self.encoded = Encoder(fullInputArraySize = 64)
         self.coordinates = [[0, 1], [0, 3], [1, 1], [1, 3], [2, 0], [3, 3]]
 
     def test_retrieveBinaryValueInputAndCoordinates(self):
@@ -25,7 +25,7 @@ class TestEncoder(unittest.TestCase):
         assert valProximity == 35.48650249088339
 
     def test_Build_Encoding(self):
-        result = self.encoded.build_Encoding(self.testArray)
+        result = self.encoded.build_Encoding(self.testArray, location = (2, 3))
 
         assert len(result) == 1200
 
@@ -34,12 +34,12 @@ class TestEncoder(unittest.TestCase):
             if i == 1:
                 counter += 1
 
-        assert counter == 60
+        assert counter == 80
 
     def test_Compute_Index(self):
-        type_input = self.encoded.variable_types#['input_piece', 'num_active', 'prox_Score']
-        value = [21889, 6, 35.48650249088339]
-        index_result = [127, 142, 52]
+        type_input = self.encoded.variable_types #['input_piece', 'num_active', 'prox_Score', location]
+        value = [21889, 6, 35.48650249088339, (2, 3)]
+        index_result = [93, 105, 38, 83] # determined these values by hand using formula in function
         for i in range(len(type_input)):
             index = self.encoded.compute_Index(type_input[i], value[i])
             assert index == index_result[i]

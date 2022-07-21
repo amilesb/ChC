@@ -16,7 +16,7 @@ class Encoder:
         the size of the input piece encoded represents the receptive field of
         the layer above.''')
 
-    def __init__(self, size=16):
+    def __init__(self, fullInputArraySize=64, receptiveFieldSize=16):
         ''' input_piece is a binary array which arises from threshold filter(s)
         being overlaid on top of the input space and then (combined) to equal
         the desired receptive field for the output.'''
@@ -25,10 +25,40 @@ class Encoder:
         # self.MINVAL = 0
         # self.RANGE = self.MAXVAL-self.MINVAL
         self.w = 20 # number of active bits in the encoding - 1
-        self.n = 400 # number of bits
+        self.n = 300 # number of bits
         self.buckets = self.n+1-self.w
-        self.variable_types = ['input_piece', 'num_active', 'prox_Score']
-        self.size = size
+        self.variable_types = ['input_piece', 'num_active', 'prox_Score', 'location']
+        self.size = receptiveFieldSize
+        self.fullInputArraySize = fullInputArraySize
+
+    def build_Encoding(self, input_piece, location):
+        '''Create the multi-encoding of the input space based on 3 implicit
+        variables.
+
+        Inputs:
+        input_piece: a binary numpy array (of square length equal to receptive
+                     field size) which arises from a threshold
+        location:    x, y coordinates of center of receptive field
+
+        Returns:
+        multiEncoding: a list representing the concatenated sparse distributed array.
+        '''
+
+        valInput, coordinates = self.retrieveBinaryValueInputAndCoordinates(input_piece)
+        valNumActive, valProximity = self.prox_Score(coordinates)
+        values = [valInput, valNumActive, valProximity, location]
+
+        multiEncoding = []
+
+        for type, value in zip(self.variable_types, values):
+            index = self.compute_Index(type, value)
+            encoding = np.zeros(self.n)
+            encoding[index:index+self.w] = 1
+            multiEncoding.append(encoding)
+
+        multiEncoding = np.concatenate(multiEncoding)
+
+        return multiEncoding
 
     def retrieveBinaryValueInputAndCoordinates(self, input_piece):
         ''' Transform 2D binary array into binary digit and store coordinate
@@ -71,32 +101,6 @@ class Encoder:
 
         return valNumActive, valProximity
 
-    def build_Encoding(self, input_piece):
-        '''Create the multi-encoding of the input space based on 3 implicit
-        variables.
-
-        Inputs:
-        input_piece: a binary numpy array which arises from a threshold
-
-        Returns:
-        multiEncoding: a list representing the concatenated sparse distributed array.
-        '''
-
-        valInput, coordinates = self.retrieveBinaryValueInputAndCoordinates(input_piece)
-        valNumActive, valProximity = self.prox_Score(coordinates)
-        values = [valInput, valNumActive, valProximity]
-
-        multiEncoding = []
-
-        for type, value in zip(self.variable_types, values):
-            index = self.compute_Index(type, value)
-            encoding = np.zeros(self.n)
-            encoding[index:index+self.w] = 1
-            multiEncoding.append(encoding)
-
-        multiEncoding = np.concatenate(multiEncoding)
-
-        return multiEncoding
 
     def compute_Index(self, type, VALUE):
         '''Find the index for a specific value for a scalar encoding.  Returns a
@@ -110,6 +114,10 @@ class Encoder:
         elif type == 'prox_Score':
             min = 0.
             max = self.helperMaxValueProximityScore(array_length=np.floor(np.sqrt(self.size))) # 257.02591608065126 = default for array length = 4
+        elif type == 'location':
+            min = 0.
+            max = self.fullInputArraySize
+            VALUE = np.sqrt(max)*VALUE[0]+VALUE[1]
         else:
             raise ValueError('wrong or no type provided.')
         range = max-min
