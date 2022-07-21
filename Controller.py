@@ -59,28 +59,46 @@ class Controller:
 
         ##########################
         print('need logic to create metric to determine if sp has settled and/or seq')
-
-## also need to calculate interference within receptive field to compute output weights
+        '''could use permanence values from spatial pooler i.e. sp.synapses[c]['permanence']
+        for every column and extract the distribution every ~100 iterations
+        then compute statistics for how quickly they are changing and stop once the change is
+        small.
+        '''
 
         ###########################
         STOP = False
         counter = 0
-        while not STOP or counter < 40000:
-            keyToTrainOn = np.random.choice(list(salience.keys()), replace=True,
-                                            p=list(salience.value()))
-            spInput = self.encoder.build_Encoding(binaryPieces[keyToTrainOn])
-            overlapScore = self.sp.computeOverlap(currentInput=spInput)
-            winningColumnsInd = self.sp.computeWinningColumns(overlapScore)
 
-            if objectToTrain == 'sp':
-                self.sp.updateSynapseParameters(winningColumnsInd, overlapScore,
-                                                spInput)
-            if objectToTrain == 'seq':
-                self.seq.evalActiveColsVersusPreds(winningColumnsInd)
-            elif objectToTrain == 'topo':
-                self.trainTopo()
+        # choose a feature (centerRF) with attention filter built in (salience)
+        centerRF = np.random.choice(list(salience.keys()), replace=True,
+                                    p=list(salience.value()))
+        # Process through encoder and into the spatial pooler
+        spInput = self.encoder.build_Encoding(binaryPieces[centerRF])
+        overlapScore = self.sp.computeOverlap(currentInput=spInput)
+        winningColumnsInd = self.sp.computeWinningColumns(overlapScore)
 
-            counter += 1
+        if objectToTrain == 'sp':
+            self.sp.updateSynapseParameters(winningColumnsInd, overlapScore,
+                                            spInput)
+        if objectToTrain == 'seq':
+            self.seq.evalActiveColsVersusPreds(winningColumnsInd)
+
+        ############## need to determine when object is recognized!!!
+        ### once recgonized create dictionary centerRF as key and feature (SDR)
+
+        ############33 nneed to include location into SDR ##############
+
+
+                    # try:
+                    #     movement = centerRF - prevCenterRF
+                    # except:
+                    #     movement = 0
+                    #
+                    # prevCenterRF = centerRF
+        elif objectToTrain == 'topo':
+            self.trainTopo()
+
+        counter += 1
 
 
 

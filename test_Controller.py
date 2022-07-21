@@ -79,6 +79,8 @@ class TestController(unittest.TestCase):
         assert 0 or 1 in binaryInputPiece
         # print(binaryInputPiece)
 
+    def test_calcInterference(self):
+        pass
 
     def test_calcCenterRF(self):
         # even case
@@ -89,6 +91,8 @@ class TestController(unittest.TestCase):
         self.controller.REC_FLD_LENGTH = 5
         centerRF = self.controller.calcCenterRF(self.cornerStart)
         assert centerRF == (2, 7)
+
+
 
 
 class TestGraph(unittest.TestCase):
