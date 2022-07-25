@@ -25,21 +25,23 @@ class TestEncoder(unittest.TestCase):
         assert valProximity == 35.48650249088339
 
     def test_Build_Encoding(self):
-        result = self.encoded.build_Encoding(self.testArray, location = (2, 3))
+        result = self.encoded.build_Encoding(self.testArray, location = (2, 3),
+                                             movement = (-5, 0)
+                                            )
 
-        assert len(result) == 1200
+        assert len(result) == 1800
 
         counter = 0
         for i in result:
             if i == 1:
                 counter += 1
 
-        assert counter == 80
+        assert counter == 120
 
     def test_Compute_Index(self):
-        type_input = self.encoded.variable_types #['input_piece', 'num_active', 'prox_Score', location]
-        value = [21889, 6, 35.48650249088339, (2, 3)]
-        index_result = [93, 105, 38, 83] # determined these values by hand using formula in function
+        type_input = self.encoded.variable_types #['input_piece', 'num_active', 'prox_Score', 'location', 'deltaX', 'deltaY']
+        value = [21889, 6, 35.48650249088339, (2, 3), -3, 8]
+        index_result = [93, 105, 38, 83, 87, 281] # determined these values by hand using formula in function
         for i in range(len(type_input)):
             index = self.encoded.compute_Index(type_input[i], value[i])
             assert index == index_result[i]

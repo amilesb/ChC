@@ -21,7 +21,7 @@ class Controller:
 
     def __init__(self):#, encoder, input_array):
         ''''''
-        # self.encoder = Encoder()
+
         # self.input_array = input_array
 
         ## use ChC total synapse weight to apply threshold filter to input
@@ -37,8 +37,8 @@ class Controller:
         Inputs:
         objectToTrain - string identifier to determine what logic to run
         **kwargs      - dictionary with pShape, attachedChC, self.sp, self.seq
-                        and self.topo passed in if already defined else created
-                        in main function
+                        self.topo, and prevCenterRF passed in if already defined
+                        else created or handled in main function
 
         Returns:
         None
@@ -50,33 +50,33 @@ class Controller:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
         binaryPieces, salience = self.extractPieces(pShape, attachedChC)
 
+        if not self.encoder:
+            S1 = (pShape[0]-self.REC_FLD_LENGTH)**2
+            S2 = self.REC_FLD_LENGTH**2
+            self.encoder = Encoder(fullInputArraySize=S1, receptiveFieldSize=S2)
 
         if not self.sp:
-            firstInputPiece = self.encoder.build_Encoding(len(binaryPieces),
-                                                          list(binaryPieces.values())[0]
+            firstInputPiece = self.encoder.build_Encoding(list(binaryPieces.values())[0],
+                                                          list(binaryPieces.keys())[0]
                                                          )
             self.sp = Spatial_Pooler(len(firstInputPiece))
+
         if not self.seq:
             self.seq = Sequencer(self.sp)
-
-        ##########################
-        print('need logic to create metric to determine if sp has settled and/or seq')
-        '''could use permanence values from spatial pooler i.e. sp.synapses[c]['permanence']
-        for every column and extract the distribution every ~100 iterations
-        then compute statistics for how quickly they are changing and stop once the change is
-        small.
-        '''
-
-        ###########################
-        STOP = False
-        counter = 0
 
         # choose a feature (centerRF) with attention filter built in (salience)
         centerRF = np.random.choice(list(salience.keys()), replace=True,
                                     p=list(salience.value()))
+        try:
+            movement = prevCenterRF - centerRF
+        except:
+            movement = 0
+
+
+
         # Process through encoder and into the spatial pooler
-        spInput = self.encoder.build_Encoding(len(binaryPieces),
-                                              binaryPieces[centerRF])
+        spInput = self.encoder.build_Encoding(binaryPieces[centerRF], centerRF,
+                                              movement)
         overlapScore = self.sp.computeOverlap(currentInput=spInput)
         winningColumnsInd = self.sp.computeWinningColumns(overlapScore)
 
@@ -86,11 +86,14 @@ class Controller:
         if objectToTrain == 'seq':
             self.seq.evalActiveColsVersusPreds(winningColumnsInd)
 
-        ############## need to determine when object is recognized!!!
-        ### once recgonized create dictionary centerRF as key and feature (SDR)
-
-        ############33 nneed to include location into SDR ##############
-
+        ############## need to construct object SDR
+        ##########################
+        print('need logic to create metric to determine if sp has settled and/or seq')
+        '''could use permanence values from spatial pooler i.e. sp.synapses[c]['permanence']
+        for every column and extract the distribution every ~100 iterations
+        then compute statistics for how quickly they are changing and stop once the change is
+        small.
+        '''
 
                     # try:
                     #     movement = centerRF - prevCenterRF

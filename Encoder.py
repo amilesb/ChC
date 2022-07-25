@@ -27,11 +27,13 @@ class Encoder:
         self.w = 20 # number of active bits in the encoding - 1
         self.n = 300 # number of bits
         self.buckets = self.n+1-self.w
-        self.variable_types = ['input_piece', 'num_active', 'prox_Score', 'location']
+        self.variable_types = ['input_piece', 'num_active', 'prox_Score',
+                               'location', 'deltaX', 'deltaY']
         self.size = receptiveFieldSize
         self.fullInputArraySize = fullInputArraySize
+        self.fullInputLength = np.sqrt(fullInputArraySize)
 
-    def build_Encoding(self, input_piece, location):
+    def build_Encoding(self, input_piece, location, movement):
         '''Create the multi-encoding of the input space based on 3 implicit
         variables.
 
@@ -46,7 +48,9 @@ class Encoder:
 
         valInput, coordinates = self.retrieveBinaryValueInputAndCoordinates(input_piece)
         valNumActive, valProximity = self.prox_Score(coordinates)
-        values = [valInput, valNumActive, valProximity, location]
+        deltaX = movement[0]
+        deltaY = movement[1]
+        values = [valInput, valNumActive, valProximity, location, deltaX, deltaY]
 
         multiEncoding = []
 
@@ -118,6 +122,12 @@ class Encoder:
             min = 0.
             max = self.fullInputArraySize
             VALUE = np.sqrt(max)*VALUE[0]+VALUE[1]
+        elif type == 'deltaX':
+            min = -self.fullInputLength
+            max = self.fullInputLength
+        elif type == 'deltaY':
+            min = -self.fullInputLength
+            max = self.fullInputLength
         else:
             raise ValueError('wrong or no type provided.')
         range = max-min
