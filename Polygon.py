@@ -102,6 +102,8 @@ class Polygon:
             self.display_Polygon(self.input_array, angle=self.angle,
                                  form=self.form, polygon=transformed_poly)
 
+        self.activeElements = self.countActiveElements()
+
         return self.input_array
 
     def display_Polygon(self, array, **kwargs): #angle, shape, polygon):
@@ -159,3 +161,81 @@ class Polygon:
         # self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
         return self.input_array
+
+    def countActiveElements(self):
+        return np.count_nonzero(self.input_array)
+
+
+class Target(Polygon):
+    '''Subclass polygon to create a simple target array with some bits on
+    (targets) and rest off.'''
+
+    def __repr__(self):
+        return (f'An array of size {self.input_array.shape} with '
+                f'{self.numTargets} active elements inserted.')
+
+    def __init__(self, array_size=32, numTargets=20, numClusters=0):
+        self.input_array = np.zeros([array_size,array_size])
+        self.numTargets = numTargets
+        if numTargets<numClusters:
+            self.numClusters = numTargets
+        else:
+            self.numClusters = numClusters
+        self.MAX_INPUT = 255
+
+    def insert_Targets(self):
+        ''' Inserts specified number of targets into a numpy array.'''
+
+        dimX = self.input_array.shape[0]
+        dimY = self.input_array.shape[1]
+        numTargets = self.numTargets
+
+        try:
+            targsPerCluster, remaining = divmod(self.numTargets, self.numClusters)
+        except ZeroDivisionError:
+            targsPerCluster = 1
+            remaining = 0
+
+        while numTargets > 0:
+            row = np.random.randint(dimX)
+            col = np.random.randint(dimY)
+            numTargsToInsert = targsPerCluster
+            if remaining > 0:
+                numTargsToInsert += 1
+                remaining -= 1
+
+            runLength = int(np.ceil(np.sqrt(numTargsToInsert)))
+            row, col = self.findRowAndColStart(row, col, runLength)
+            rowStart, colStart = row, col
+            rowStop, colStop = row+runLength, col+runLength
+
+            if self.input_array[rowStart:rowStop, colStart:colStop].any():
+                continue
+
+            while numTargsToInsert:
+                self.input_array[row, col] = self.MAX_INPUT
+                numTargets -= 1
+                numTargsToInsert -= 1
+                row += 1
+                if row > rowStop:
+                    row = rowStart
+                    col += 1
+
+        self.activeElements = self.countActiveElements()
+
+        return
+
+
+    def findRowAndColStart(self, row, col, runLength):
+        '''Helper function to compute safe place to start adding on bits'''
+
+        if row-runLength < 0:
+            row = 0
+        else:
+            row = row-runLength
+        if col-runLength < 0:
+            col = 0
+        else:
+            col = col-runLength
+
+        return int(row), int(col)

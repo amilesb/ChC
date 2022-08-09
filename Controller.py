@@ -72,8 +72,6 @@ class Controller:
         except:
             movement = 0
 
-
-
         # Process through encoder and into the spatial pooler
         spInput = self.encoder.build_Encoding(binaryPieces[centerRF], centerRF,
                                               movement)
@@ -95,16 +93,11 @@ class Controller:
         small.
         '''
 
-                    # try:
-                    #     movement = centerRF - prevCenterRF
-                    # except:
-                    #     movement = 0
-                    #
-                    # prevCenterRF = centerRF
-        elif objectToTrain == 'topo':
+        if objectToTrain == 'topo':
             self.trainTopo()
 
-        counter += 1
+        ########### work on how movement affects SDR  -- object is set of features at location
+        #### need to incorporate movement into Enncoder?!  maybe not  perhaps movement is inherent within receptive field of column!!
 
 
 

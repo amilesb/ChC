@@ -91,6 +91,16 @@ class TestPoly(unittest.TestCase):
         self.noisy.add_Noise(40)
         self.noisy.display_Polygon(self.noisy.input_array, angle=self.noisy.angle)
 
+class TestTarget(unittest.TestCase):
+
+    def setUp(self):
+        self.targ = Polygon.Target(array_size=32, numClusters=5)
+
+    def test_insert_Targets(self):
+        self.targ.insert_Targets()
+        self.targ.display_Polygon(self.targ.input_array)
+
+        assert self.targ.activeElements == self.targ.numTargets
 
 
 if __name__ == '__main__':
