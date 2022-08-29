@@ -121,6 +121,15 @@ class TestChC(unittest.TestCase):
         assert sum1 == 8
         assert sum2 == 13
 
+    @mock.patch('random.uniform')
+    def test_total_Active_Weight(self, uniform_mock):
+        uniform_mock.return_value = 0.5
+        self.PyC = self.fake_PyC_dict
+        sum1 = ChC.total_Active_Weight(self, (1,1), 0.75)
+        sum2 = ChC.total_Active_Weight(self, (2,2), 0.25)
+        assert sum1 == 8
+        assert sum2 == 0
+
     def test_Find_Max_Connected_ChC(self):
         j = 0
         for k, v in self.fake_ChC_dict.items():

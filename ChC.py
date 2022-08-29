@@ -120,10 +120,22 @@ class ChC:
 
 
     def total_Synapse_Weight(self, PyC_array_element):
-        '''Takes a point in the PyC input space at a tuple and returns the total
+        '''Takes a point in the PyC input space as a tuple and returns the total
         synapse weight attached to it.'''
         return sum([list(chc.values())[0] for chc in self.PyC[PyC_array_element]])
 
+
+    def total_Active_Weight(self, PyC_array_element, avgPercentFR_RF):
+        '''Takes a point in the PyC input space as a tuple and average percent
+        firing rate within the receptive field being anayzed and returns the
+        total active synapse weight attached to that input cell.'''
+
+        total = 0
+        for i, chc in enumerate(self.PyC[PyC_array_element]):
+            if avgPercentFR_RF >= random.uniform(0, 1):
+                total += list(chc.values())[0]
+
+        return total
 
     def find_Max_Connected_ChC(self, attached_chcs):
         '''Takes a list of attached chandelier cells in dictionary form with
@@ -306,3 +318,36 @@ class ChC:
         for pyc_pt in self.PyC_points:
             connected_chcs = self.PyC[pyc_pt]
             connected_chcs.sort(key=lambda x: list(x.keys())[0])
+
+
+class AIS:
+    '''Creates an Axon Initial Segment for each cell in the input space.'''
+
+    def __repr__(self):
+        return (f'''This class returns a numpy array with an AIS placed between
+                    0 and max number of chandelier cells.''')
+
+    def __init__(self, Polygon_Array, ChC):
+        self.AIS = np.zeros(Polygon_Array.input_array.size)
+        self.MAX = ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        for i in range(self.AIS.size):
+            self.AIS[i] = self.MAX/2 # naively set AIS to midway point
+
+    def moveAIS(self, idx):
+        '''Accept an index and move AIS up or down to assist in improving
+        threshold discrimination.'''
+
+'''
+use the average input signal relative to max to determine how many chcs to turn on
+so if input is near ceiling all chcs on
+if input very low very few chcs turned on
+
+create ais and move up or down to reduce impact of chcs to find targets
+
+movement consists of random set of new chcs (same initial number as above)
+
+output dynamically shapes input receptive field so narrow triangle and wide triangle
+even though different in lower level but output next layer input is constant!!!
+note example using triangle in 2d but in reality is sdr in 3d and potentially
+covering n dims feature space!
+'''
