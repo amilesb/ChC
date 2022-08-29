@@ -47,13 +47,14 @@ class Processor:
         '''
 
         # input sys arg inputs and process
-
         if not pShape or not attachedChC:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
 
+        # build ais
+        self.AIS = AIS(pShape, attachedChC)
+
         fldHEIGHT = pShape.input_array.shape[0]
         fldWIDTH = pShape.input_array.shape[1]
-
         intValArray = np.zeros(fldHEIGHT, fldWIDTH)
 
         if sparseType=='Percent':
@@ -70,18 +71,30 @@ class Processor:
 
         threshold = False
         input_array = pShape.input_array
-        maxValue = np.amax(input_array)
-        chcStep = maxValue/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        array_MAX = pShape.MAX_INPUT
 
         targetIndxs = self.applyReceptiveField(input_array, attachedChC,
-                                               chcStep, threshold, sparseNum)
+                                               array_MAX, threshold, sparseNum)
 
 
 
 
         # firingRateOutput = self.calcInterference(result, threshold)
 
+        '''
+        use the average input signal relative to max to determine how many chcs to turn on
+        so if input is near ceiling all chcs on
+        if input very low very few chcs turned on
 
+        create ais and move up or down to reduce impact of chcs to find targets
+
+        movement consists of random set of new chcs (same initial number as above)
+
+        output dynamically shapes input receptive field so narrow triangle and wide triangle
+        even though different in lower level but output next layer input is constant!!!
+        note example using triangle in 2d but in reality is sdr in 3d and potentially
+        covering n dims feature space!
+        '''
 
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
@@ -141,7 +154,7 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, input_array, attachedChC, chcStep, threshold,
+    def applyReceptiveField(self, input_array, attachedChC, array_MAX, threshold,
                             sparseNum, factor=1, flag=None,
                             prevTargetsFound=0):
         ''' Recursive function returns an array of the same size as the
@@ -151,7 +164,7 @@ class Processor:
         input_array      - Numpy array representing a grayscale image
         attachedChC      - ChC object representing map of array coordinates
                            to connected chandelier cells
-        chcStep          - float that represents max_input_value/max_ChC_Weight
+        array_MAX        - float that represents max allowed value in input
         threshold        - float to compare against filtered input
         sparseNum        - desired number of targets
         factor           - momentum factor to accelerate or (decelerate) changes
@@ -165,6 +178,8 @@ class Processor:
         '''
 
         avgInputValInRF = np.mean(input_array)
+        avgPercFR_of_RF_arrayMAX = avgInputValInRF/array_MAX
+        chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
         if not threshold:
             threshold = avgInputValInRF/chcStep
@@ -174,13 +189,17 @@ class Processor:
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
             for j in range(input_array.shape[1]):
-                weight = attachedChC.total_Synapse_Weight(PyC_array_element=(i,j))
+                weight = attachedChC.total_Active_Weight(PyC_array_element=(i,j),
+                                                         avgPercentFR_RF=avgPercFR_of_RF_arrayMAX)
+                weight -= self.AIS[i, j]
+                if weight < 0:
+                    wieght = 0
                 result[i, j] = max(input_array[(i,j)] - chcStep*weight, 0)
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)
 
-        if targetsFound == sparseNum: # or chcStep*factor < 1:
+        if targetsFound == sparseNum:
             return np.nonzero(binaryInputPiece)
 
         print('targs', targetsFound)
@@ -189,18 +208,13 @@ class Processor:
         print('chcStep', chcStep)
 
         if targetsFound > sparseNum:
-            threshold += chcStep
             if prevTargetsFound > sparseNum:
-                chcStep += 1
+                for i, j in binaryInputPiece:
+                    AIS[i, j] -= 1
         if targetsFound < sparseNum:
-            threshold -= chcStep
             if prevTargetsFound < sparseNum:
-                chcStep -= 1
-
-        if chcStep < 0:
-            chcStep = 0
-        if chcStep > attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
-            chcStep = np.amax(input_array)/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+                for i, j in binaryInputPiece:
+                    AIS[i, j] += 1
 
         prevTargetsFound = targetsFound
 

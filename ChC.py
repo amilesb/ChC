@@ -328,26 +328,13 @@ class AIS:
                     0 and max number of chandelier cells.''')
 
     def __init__(self, Polygon_Array, ChC):
-        self.AIS = np.zeros(Polygon_Array.input_array.size)
+        self.AIS = np.zeros(shape = (Polygon_Array.input_array.shape[0],
+                                    Polygon_Array.input_array.shape[1]))
         self.MAX = ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        for i in range(self.AIS.size):
-            self.AIS[i] = self.MAX/2 # naively set AIS to midway point
+        for i in range(self.AIS.shape[0]):
+            for j in range(self.AIS.shape[1]):
+                self.AIS[i, j] = self.MAX/2 # naively set AIS to midway point
 
     def moveAIS(self, idx):
         '''Accept an index and move AIS up or down to assist in improving
         threshold discrimination.'''
-
-'''
-use the average input signal relative to max to determine how many chcs to turn on
-so if input is near ceiling all chcs on
-if input very low very few chcs turned on
-
-create ais and move up or down to reduce impact of chcs to find targets
-
-movement consists of random set of new chcs (same initial number as above)
-
-output dynamically shapes input receptive field so narrow triangle and wide triangle
-even though different in lower level but output next layer input is constant!!!
-note example using triangle in 2d but in reality is sdr in 3d and potentially
-covering n dims feature space!
-'''

@@ -3,7 +3,7 @@ import unittest
 from unittest import mock
 from pprint import pprint
 
-from ChC import ChC
+from ChC import ChC, AIS
 from Encoder import Encoder
 from Polygon import Polygon
 from Processor import Processor
@@ -14,6 +14,7 @@ class TestProcessor(unittest.TestCase):
     def setUp(self):
         self.processor = Processor()
         self.pShape, self.attachedChC = self.processor.buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4, y=4, wd=4, ht=3, angle=0)
+        self.processor.AIS = AIS(self.pShape, self.attachedChC)
         self.cornerStart = 0, 5
         self.intValArray = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 1, 0, 0, 5, 9 ,0, 0, 0, 0],
@@ -49,13 +50,12 @@ class TestProcessor(unittest.TestCase):
 
 
     def test_applyReceptiveField(self):
-        chcStep = np.amax(self.intValArray)/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-
+        array_MAX=9
         targetIndxs = self.processor.applyReceptiveField(self.intValArray,
-                                                          self.attachedChC,
-                                                          chcStep,
-                                                          threshold=None,
-                                                          sparseNum=10)
+                                                         self.attachedChC,
+                                                         array_MAX,
+                                                         threshold=None,
+                                                         sparseNum=10)
 
         print(targetIndxs)
         # assert targetIndxs.size == 10
