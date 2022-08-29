@@ -62,10 +62,6 @@ class Processor:
             sparseNum = sparsity
 
         '''selectZone
-        applyReceptiveField
-        countFound
-        if countFound < sparseNum: decrease threshold
-        if countFound > sparseNum: increase threshold
         execute movement
         trueCountFound = counfound above and again with new random zones
         sparseNum left to find = sparseNum - trueCountFound
@@ -73,29 +69,25 @@ class Processor:
         '''
 
         threshold = False
-        targetsFound = 0
         input_array = pShape.input_array
-        chcStep = np.amax(input_array)/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        maxValue = np.amax(input_array)
+        chcStep = maxValue/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
-        binaryInputPiece, threshold = self.applyReceptiveField(input_array,
-                                                               attachedChC,
-                                                               chcStep,
-                                                               threshold)
-
+        targetIndxs = self.applyReceptiveField(input_array, attachedChC,
+                                               chcStep, threshold, sparseNum)
 
 
+
+
+        # firingRateOutput = self.calcInterference(result, threshold)
 
 
 
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
 
-
         if objectToTrain == 'seq':
             self.seq.evalActiveColsVersusPreds(winningColumnsInd)
-
-        ############## need to construct object SDR
-        ##########################
 
         if objectToTrain == 'topo':
             self.trainTopo()
@@ -149,10 +141,11 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, input_array, attachedChC, threshold, sparseNum,
-                            flag=None, prevTargetsFound=None):
-        ''' Function returns an array of the same size as the receptive field
-        filtered by the threshold set from the connected chandelier cell weights.
+    def applyReceptiveField(self, input_array, attachedChC, chcStep, threshold,
+                            sparseNum, factor=1, flag=None,
+                            prevTargetsFound=0):
+        ''' Recursive function returns an array of the same size as the
+        receptive field filtered by the threshold.
 
         Inputs:
         input_array      - Numpy array representing a grayscale image
@@ -161,6 +154,8 @@ class Processor:
         chcStep          - float that represents max_input_value/max_ChC_Weight
         threshold        - float to compare against filtered input
         sparseNum        - desired number of targets
+        factor           - momentum factor to accelerate or (decelerate) changes
+                           to threshold
         flag             - string to represent which way to change threshold
         prevTargetsFound - float
 
@@ -185,34 +180,63 @@ class Processor:
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)
 
-        if targetsFound == sparseNum:
-            break
+        if targetsFound == sparseNum: # or chcStep*factor < 1:
+            return np.nonzero(binaryInputPiece)
 
-        if not flag:
-            factor = 1
-        elif flag == 'UP':
-            factor *= 2
-        elif flag == 'DOWN':
-            factor /= 2
+        print('targs', targetsFound)
+        print('factor', factor)
+        print('threshold', threshold)
+        print('chcStep', chcStep)
 
         if targetsFound > sparseNum:
-            threshold += chcStep*factor
+            threshold += chcStep
             if prevTargetsFound > sparseNum:
-                flag = 'UP'
-            else:
-                flag = 'DOWN'
+                chcStep += 1
         if targetsFound < sparseNum:
-            threshold -= chcStep*factor
+            threshold -= chcStep
             if prevTargetsFound < sparseNum:
-                flag = 'UP'
-            else:
-                flag = 'DOWN'
+                chcStep -= 1
+
+        if chcStep < 0:
+            chcStep = 0
+        if chcStep > attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT:
+            chcStep = np.amax(input_array)/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
         prevTargetsFound = targetsFound
 
-        # firingRateOutput = self.calcInterference(result, threshold)
+        self.applyReceptiveField(input_array, attachedChC, chcStep, threshold,
+                                 sparseNum, factor, flag, prevTargetsFound)
 
-        return binaryInputPiece, threshold #, firingRateOutput
+
+        # if flag == 'UP':
+        #     factor *= 2
+        # if flag == 'DOWN':
+        #     factor /= 2
+        #
+        # if targetsFound == sparseNum: # or chcStep*factor < 1:
+        #     return np.nonzero(binaryInputPiece)
+        #
+        # print('targs', targetsFound)
+        # print('factor', factor)
+        # print('threshold', threshold)
+        # print('chcStep', chcStep)
+        #
+        # if targetsFound > sparseNum:
+        #     threshold += chcStep*factor
+        #     if prevTargetsFound == None:
+        #         flag = None
+        #     elif prevTargetsFound > sparseNum:
+        #         flag = 'UP'
+        #     else:
+        #         flag = 'DOWN'
+        # if targetsFound < sparseNum:
+        #     threshold -= chcStep*factor
+        #     if prevTargetsFound == None:
+        #         flag = None
+        #     elif prevTargetsFound < sparseNum:
+        #         flag = 'UP'
+        #     else:
+        #         flag = 'DOWN'
 
 
     def calcInterference(self, result, threshold):
