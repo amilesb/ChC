@@ -56,33 +56,37 @@ class Processor:
         fldHEIGHT = pShape.input_array.shape[0]
         fldWIDTH = pShape.input_array.shape[1]
         intValArray = np.zeros(fldHEIGHT, fldWIDTH)
+        threshold = np.zeros((fldHEIGHT, fldWIDTH))
+        threshold[:] = -1
 
         if sparseType=='Percent':
             sparseNum = np.round(pShape.size*sparsity)
         else:
             sparseNum = sparsity
 
-        '''selectZone
-        execute movement
-        trueCountFound = counfound above and again with new random zones
-        sparseNum left to find = sparseNum - trueCountFound
-        subdivide array
-        '''
-
-        input_array = pShape.input_array
-        array_MAX = pShape.MAX_INPUT
-        threshold = np.ndarray((input_array.shape[0], input_array.shape[1]))
-        chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        avgInputValInRF = np.mean(input_array)
-        threshold[:] = avgInputValInRF/chcStep
-
-        targetIndxs = self.applyReceptiveField(input_array, attachedChC,
-                                               array_MAX, threshold, sparseNum)
+        targetIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
+                                               sparseNum)
 
 
-        self.internalMove()
-        self.externalMove()
+        # internal movement to sift out noise
+        falseTargsDueToNoise = []
+        for i in range(5):
+            input_array = pShape.add_Noise()
+            pShape.input_array = input_array
+            newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
+                                                sparseNum)
+            falseTargsDueToNoise.append(set(newIndxs) ^ set(targetIndxs))
+            targetIndxs = [val for val in targetIndxs if value in newIndxs]
 
+
+        if targetIndxs == sparseNum:
+            return targetIndxs
+        else:
+            pass
+            # found targets due to noise
+
+        # self.externalMove()
+        # self.internalMove(pShape)
 
         # firingRateOutput = self.calcInterference(result, threshold)
 
@@ -94,6 +98,15 @@ class Processor:
         note example using triangle in 2d but in reality is sdr in 3d and potentially
         covering n dims feature space!
         '''
+
+
+        '''selectZone
+        execute movement
+        trueCountFound = counfound above and again with new random zones
+        sparseNum left to find = sparseNum - trueCountFound
+        subdivide array
+        '''
+
 
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
@@ -153,8 +166,8 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, input_array, attachedChC, array_MAX, threshold,
-                            sparseNum, prevTargetsFound=0, oscFlag=0):
+    def applyReceptiveField(self, pShape, attachedChC, threshold, sparseNum,
+                            prevTargetsFound=0, oscFlag=0):
         ''' Recursive BIG function returns an array of the same size as the
         receptive field filtered by the threshold i.e. generates an SDR!
 
@@ -162,7 +175,6 @@ class Processor:
         input_array      - Numpy array representing a grayscale image
         attachedChC      - ChC object representing map of array coordinates
                            to connected chandelier cells
-        array_MAX        - float that represents max allowed value in input
         threshold        - np array of float values to compare against input
         sparseNum        - desired number of targets
         prevTargetsFound - float
@@ -172,9 +184,14 @@ class Processor:
         targetIndxs      - list of row, col indices for found targets
         '''
 
+        input_array = pShape.input_array
+        array_MAX = pShape.MAX_INPUT
         avgInputValInRF = np.mean(input_array)
         avgPercFR_of_RF_arrayMAX = avgInputValInRF/array_MAX
         chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        if threshold.any() < 0:
+            threshold[:] = avgInputValInRF/chcStep
+
 
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
@@ -220,9 +237,8 @@ class Processor:
 
         prevTargetsFound = targetsFound
 
-        return self.applyReceptiveField(input_array, attachedChC, array_MAX,
-                                        threshold, sparseNum, prevTargetsFound,
-                                        oscFlag)
+        return self.applyReceptiveField(pShape, attachedChC, threshold,
+                                        sparseNum, prevTargetsFound, oscFlag)
 
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):

@@ -51,24 +51,25 @@ class TestProcessor(unittest.TestCase):
 
     def test_applyReceptiveField(self):
         array_MAX=9
+        self.pShape.input_array = self.intValArray
         threshold = np.ndarray((self.intValArray.shape[0], self.intValArray.shape[1]))
-        chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        avgInputValInRF = np.mean(self.intValArray)
-        threshold[:] = avgInputValInRF/chcStep
-        targetIndxs = self.processor.applyReceptiveField(self.intValArray,
+        threshold[0, 0] = -1
+        # chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        # avgInputValInRF = np.mean(self.intValArray)
+        # threshold[:] = avgInputValInRF/chcStep
+        targetIndxs = self.processor.applyReceptiveField(self.pShape,
                                                          self.attachedChC,
-                                                         array_MAX,
                                                          threshold,
                                                          sparseNum=10)
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
-        threshold[:] = avgInputValInRF/chcStep
-        targetIndxs = self.processor.applyReceptiveField(self.intValArray,
+        threshold[0, 0] = -1
+        targetIndxs = self.processor.applyReceptiveField(self.pShape,
                                                          self.attachedChC,
-                                                         array_MAX,
                                                          threshold,
                                                          sparseNum=10)
+        print(targetIndxs)
         assert len(targetIndxs) == 10
 
 
@@ -127,7 +128,7 @@ class TestProcessor(unittest.TestCase):
         for i in range(10):
             assert row[i] == i
             assert col[i] == i
-            
+
 
     def test_computeMinDist(self):
         miss = (1,1)
