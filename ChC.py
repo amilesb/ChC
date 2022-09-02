@@ -328,12 +328,12 @@ class AIS:
                     0 and max number of chandelier cells.''')
 
     def __init__(self, Polygon_Array, ChC):
-        self.AIS = np.zeros(shape = (Polygon_Array.input_array.shape[0],
+        self.ais = np.zeros(shape = (Polygon_Array.input_array.shape[0],
                                     Polygon_Array.input_array.shape[1]))
         self.MAX = ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        for i in range(self.AIS.shape[0]):
-            for j in range(self.AIS.shape[1]):
-                self.AIS[i, j] = self.MAX/2 # naively set AIS to midway point
+        for i in range(self.ais.shape[0]):
+            for j in range(self.ais.shape[1]):
+                self.ais[i, j] = self.MAX/2 # naively set AIS to midway point
 
     def moveAIS(self, idx):
         '''Accept an index and move AIS up or down to assist in improving

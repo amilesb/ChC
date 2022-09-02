@@ -46,7 +46,7 @@ class Processor:
         SDR         - extracted SDR
         '''
 
-        # input sys arg inputs and process
+        # from kwargs
         if not pShape or not attachedChC:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
 
@@ -69,25 +69,24 @@ class Processor:
         subdivide array
         '''
 
-        threshold = False
         input_array = pShape.input_array
         array_MAX = pShape.MAX_INPUT
+        threshold = np.ndarray((input_array.shape[0], input_array.shape[1]))
+        chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        avgInputValInRF = np.mean(input_array)
+        threshold[:] = avgInputValInRF/chcStep
 
         targetIndxs = self.applyReceptiveField(input_array, attachedChC,
                                                array_MAX, threshold, sparseNum)
 
 
+        self.internalMove()
+        self.externalMove()
 
 
         # firingRateOutput = self.calcInterference(result, threshold)
 
         '''
-        use the average input signal relative to max to determine how many chcs to turn on
-        so if input is near ceiling all chcs on
-        if input very low very few chcs turned on
-
-        create ais and move up or down to reduce impact of chcs to find targets
-
         movement consists of random set of new chcs (same initial number as above)
 
         output dynamically shapes input receptive field so narrow triangle and wide triangle
@@ -155,102 +154,144 @@ class Processor:
 
 
     def applyReceptiveField(self, input_array, attachedChC, array_MAX, threshold,
-                            sparseNum, factor=1, flag=None,
-                            prevTargetsFound=0):
-        ''' Recursive function returns an array of the same size as the
-        receptive field filtered by the threshold.
+                            sparseNum, prevTargetsFound=0, oscFlag=0):
+        ''' Recursive BIG function returns an array of the same size as the
+        receptive field filtered by the threshold i.e. generates an SDR!
 
         Inputs:
         input_array      - Numpy array representing a grayscale image
         attachedChC      - ChC object representing map of array coordinates
                            to connected chandelier cells
         array_MAX        - float that represents max allowed value in input
-        threshold        - float to compare against filtered input
+        threshold        - np array of float values to compare against input
         sparseNum        - desired number of targets
-        factor           - momentum factor to accelerate or (decelerate) changes
-                           to threshold
-        flag             - string to represent which way to change threshold
         prevTargetsFound - float
+        oscFlag          - Flag to prevent infinite recursion
 
         Returns:
-        binarySDR        - binary 2D numpy array extracted from input
-        threshold        - float value
+        targetIndxs      - list of row, col indices for found targets
         '''
 
         avgInputValInRF = np.mean(input_array)
         avgPercFR_of_RF_arrayMAX = avgInputValInRF/array_MAX
         chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
-        if not threshold:
-            threshold = avgInputValInRF/chcStep
-        if threshold < 0:
-            threshold = 0
-
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
             for j in range(input_array.shape[1]):
                 weight = attachedChC.total_Active_Weight(PyC_array_element=(i,j),
                                                          avgPercentFR_RF=avgPercFR_of_RF_arrayMAX)
-                weight -= self.AIS[i, j]
+                weight -= self.AIS.ais[i, j]
                 if weight < 0:
-                    wieght = 0
+                    weight = 0
                 result[i, j] = max(input_array[(i,j)] - chcStep*weight, 0)
         binaryInputPiece = np.where(result > threshold, 1, 0)
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)
 
-        if targetsFound == sparseNum:
-            return np.nonzero(binaryInputPiece)
+        if targetsFound == sparseNum or oscFlag == 100:
+            row, col = self.getNonzeroIndices(binaryInputPiece)
+            targetIndxs = [(r, c) for r, c in zip(row, col)]
+            return targetIndxs
 
-        print('targs', targetsFound)
-        print('factor', factor)
-        print('threshold', threshold)
-        print('chcStep', chcStep)
+        '''
+        # print('targs', targetsFound)
+        # print('threshold', threshold)
+        # print('chcStep', chcStep)
+        # print('binary', binaryInputPiece.nonzero())
+        '''
 
+        # Note AIS moves opposite to threshold; decrease AIS means closer to cell body
+        # i.e. increase ChC which can affect output
         if targetsFound > sparseNum:
-            if prevTargetsFound > sparseNum:
-                for i, j in binaryInputPiece:
-                    AIS[i, j] -= 1
+            self.moveAIS(binaryInputPiece, 'decrease')
+            if prevTargetsFound > sparseNum: # assume gradient; punish those at the higher end
+                self.adjustThreshold(binaryInputPiece, threshold, 'up')
+            else:
+                oscFlag += 1
         if targetsFound < sparseNum:
-            if prevTargetsFound < sparseNum:
-                for i, j in binaryInputPiece:
-                    AIS[i, j] += 1
+            binaryInvert = 1-binaryInputPiece
+            self.moveAIS(binaryInvert, 'increase')
+            if prevTargetsFound < sparseNum: # assume gradient; boost those at the lowest end
+                self.adjustThreshold(binaryInputPiece, threshold, 'down')
+            else:
+                oscFlag += 1
+
 
         prevTargetsFound = targetsFound
 
-        self.applyReceptiveField(input_array, attachedChC, chcStep, threshold,
-                                 sparseNum, factor, flag, prevTargetsFound)
+        return self.applyReceptiveField(input_array, attachedChC, array_MAX,
+                                        threshold, sparseNum, prevTargetsFound,
+                                        oscFlag)
 
 
-        # if flag == 'UP':
-        #     factor *= 2
-        # if flag == 'DOWN':
-        #     factor /= 2
-        #
-        # if targetsFound == sparseNum: # or chcStep*factor < 1:
-        #     return np.nonzero(binaryInputPiece)
-        #
-        # print('targs', targetsFound)
-        # print('factor', factor)
-        # print('threshold', threshold)
-        # print('chcStep', chcStep)
-        #
-        # if targetsFound > sparseNum:
-        #     threshold += chcStep*factor
-        #     if prevTargetsFound == None:
-        #         flag = None
-        #     elif prevTargetsFound > sparseNum:
-        #         flag = 'UP'
-        #     else:
-        #         flag = 'DOWN'
-        # if targetsFound < sparseNum:
-        #     threshold -= chcStep*factor
-        #     if prevTargetsFound == None:
-        #         flag = None
-        #     elif prevTargetsFound < sparseNum:
-        #         flag = 'UP'
-        #     else:
-        #         flag = 'DOWN'
+    def moveAIS(self, binaryInputPiece, direction, max_wt=40):
+        '''Helper function to get indices of nonzero elements and adjust AIS
+        value for each of those elements.'''
+
+        nonzero = binaryInputPiece.nonzero()
+        row = nonzero[0]
+        col = nonzero[1]
+        # self.getNonzeroIndices(binaryInputPiece)
+        for idx1, idx2 in zip(row, col):
+            if direction == 'decrease':
+                self.AIS.ais[idx1, idx2] = max(0, self.AIS.ais[idx1, idx2]-1)
+            if direction == 'increase':
+                self.AIS.ais[idx1, idx2] = min(max_wt, self.AIS.ais[idx1, idx2]+1)
+
+
+    def adjustThreshold(self, binaryInputPiece, threshold, direction):
+        '''Helper function to adjust the threshold values on hits up to help
+        remove stray targets or threshold values on misses down to help locate
+        additional targets.'''
+
+        row_hit, col_hit = self.getNonzeroIndices(binaryInputPiece)
+        hits = [(r, c) for r, c in zip(row_hit, col_hit)]
+
+        binaryInvert = 1-binaryInputPiece
+        row_miss, col_miss = self.getNonzeroIndices(binaryInvert)
+        misses = [(r, c) for r, c in zip(row_miss, col_miss)]
+
+        dist_char = binaryInputPiece.size*0.35
+
+        if direction == 'up':
+            for i, hit in enumerate(hits):
+                if len(misses) == 0: # guard against edge case where all values are hits
+                    dist = 0
+                else:
+                    dist = self.computeMinDist(hit, misses)
+                threshold[hit[0], hit[1]] += np.exp(dist/dist_char)
+
+        if direction == 'down':
+            for i, miss in enumerate(misses):
+                if len(hits) == 0:
+                    dist = 0
+                else:
+                    dist = self.computeMinDist(miss, hits)
+                threshold[miss[0], miss[1]] -= np.exp(dist/dist_char)
+                if threshold[miss[0], miss[1]] < 0:
+                    threshold[miss[0], miss[1]] = 0
+
+
+    def getNonzeroIndices(self, binaryInputPiece):
+        '''Helper function to get indices of nonzero elements.'''
+        nonzero = binaryInputPiece.nonzero()
+        row = nonzero[0]
+        col = nonzero[1]
+
+        return row, col
+
+
+    def computeMinDist(self, subject, listOfTargs):
+        '''Helper function to compute distance from thresholded zero elements to
+        farthest distance from ALL postive targets.'''
+        dist = 10e10
+        for targ in listOfTargs:
+            d = np.sqrt((targ[0]-subject[0])**2 + (targ[1]-subject[1])**2)
+            if d < dist:
+                dist = d
+
+        return dist
 
 
     def calcInterference(self, result, threshold):

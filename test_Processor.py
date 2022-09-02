@@ -51,14 +51,92 @@ class TestProcessor(unittest.TestCase):
 
     def test_applyReceptiveField(self):
         array_MAX=9
+        threshold = np.ndarray((self.intValArray.shape[0], self.intValArray.shape[1]))
+        chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        avgInputValInRF = np.mean(self.intValArray)
+        threshold[:] = avgInputValInRF/chcStep
         targetIndxs = self.processor.applyReceptiveField(self.intValArray,
                                                          self.attachedChC,
                                                          array_MAX,
-                                                         threshold=None,
+                                                         threshold,
                                                          sparseNum=10)
+        assert len(targetIndxs) == 10
 
-        print(targetIndxs)
-        # assert targetIndxs.size == 10
+        self.intValArray[0, 0] = 18
+        threshold[:] = avgInputValInRF/chcStep
+        targetIndxs = self.processor.applyReceptiveField(self.intValArray,
+                                                         self.attachedChC,
+                                                         array_MAX,
+                                                         threshold,
+                                                         sparseNum=10)
+        assert len(targetIndxs) == 10
+
+
+    def test_moveAIS(self):
+        binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
+        direction = 'decrease'
+        for i in range(40):
+            self.processor.moveAIS(binaryInputPiece, direction)
+
+        assert self.processor.AIS.ais.any() == 0
+
+        direction = 'increase'
+        for i in range(50):
+            self.processor.moveAIS(binaryInputPiece, direction)
+
+        testArray = np.ones((self.intValArray.shape[0], self.intValArray.shape[1]))
+        testArray *= 40
+
+        assert self.processor.AIS.ais.all() == testArray.all()
+
+
+    def test_adjustThreshold(self):
+        # Test up
+        binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
+        self.processor.threshold = np.ndarray((self.intValArray.shape[0],
+                                               self.intValArray.shape[1]))
+        self.processor.threshold[0:9] = 10
+        self.processor.threshold[9:] = 5
+
+        for direction in ['up', 'down']:
+            self.processor.adjustThreshold(binaryInputPiece,
+                                           self.processor.threshold,
+                                           direction)
+
+            for i in range(10):
+                for j in range(10):
+                    if i < 9:
+                        assert self.processor.threshold[i, j] == 11
+                    else:
+                        assert self.processor.threshold[i, j] == 6
+            # Reset for 'down' 2nd case
+            binaryInputPiece = np.where(self.intValArray > 10e10, 1, 0)
+            self.processor.threshold[0:9] = 12
+            self.processor.threshold[9:] = 7
+
+
+    def test_getNonzeroIndices(self):
+        array = np.zeros((10, 10))
+        for i in range(10):
+            for j in range(10):
+                if i == j:
+                    array[i, j] = 5
+
+        row, col = self.processor.getNonzeroIndices(array)
+
+        for i in range(10):
+            assert row[i] == i
+            assert col[i] == i
+            
+
+    def test_computeMinDist(self):
+        miss = (1,1)
+        hits = [(1,4), (1,7), (4,1), (4,4), (4,7), (8,0)]
+        dist = self.processor.computeMinDist(miss, hits)
+
+        assert dist == 3
+
+
 
     def test_calcInterference(self):
         pass
