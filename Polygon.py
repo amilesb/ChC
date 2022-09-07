@@ -27,6 +27,7 @@ class Polygon:
         self.angle = angle
         self.form = form
         self.MAX_INPUT = 255
+        self.activeElements = []
 
     def create_Simple_Polygon(self, form):
         ''' Returns the coordinates of the vertex points for a polygon of
@@ -98,11 +99,14 @@ class Polygon:
         rr, cc = polygon_perimeter(rr, cc, shape=self.input_array.shape,
                                    clip=False)
         self.input_array[rr, cc] = self.MAX_INPUT
+        print('rr', rr)
+        print('cc', cc)
+        [self.activeElements.append((r, c)) for r, c in zip(rr, cc) if (r, c) not in self.activeElements]
         if display:
             self.display_Polygon(self.input_array, angle=self.angle,
                                  form=self.form, polygon=transformed_poly)
 
-        self.activeElements = self.countActiveElements()
+        self.numActiveElements = self.countActiveElements()
 
         return self.input_array
 
@@ -182,6 +186,7 @@ class Target(Polygon):
         else:
             self.numClusters = numClusters
         self.MAX_INPUT = 255
+        self.activeElements = []
 
     def insert_Targets(self):
         ''' Inserts specified number of targets into a numpy array.'''
@@ -214,6 +219,7 @@ class Target(Polygon):
 
             while numTargsToInsert:
                 self.input_array[row, col] = self.MAX_INPUT
+                self.activeElements.append((row, col))
                 numTargets -= 1
                 numTargsToInsert -= 1
                 row += 1
@@ -221,7 +227,7 @@ class Target(Polygon):
                     row = rowStart
                     col += 1
 
-        self.activeElements = self.countActiveElements()
+        self.numActiveElements = self.countActiveElements()
 
         return
 

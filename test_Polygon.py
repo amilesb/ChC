@@ -100,7 +100,7 @@ class TestTarget(unittest.TestCase):
         self.targ.insert_Targets()
         self.targ.display_Polygon(self.targ.input_array)
 
-        assert self.targ.activeElements == self.targ.numTargets
+        assert self.targ.numActiveElements == self.targ.numTargets
 
 
 if __name__ == '__main__':
