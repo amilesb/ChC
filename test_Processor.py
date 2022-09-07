@@ -54,13 +54,14 @@ class TestProcessor(unittest.TestCase):
         self.pShape.input_array = self.intValArray
         threshold = np.ndarray((self.intValArray.shape[0], self.intValArray.shape[1]))
         threshold[0, 0] = -1
+        sparseNum = {'low': 10, 'high': 10}
         # chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         # avgInputValInRF = np.mean(self.intValArray)
         # threshold[:] = avgInputValInRF/chcStep
         targetIndxs = self.processor.applyReceptiveField(self.pShape,
                                                          self.attachedChC,
                                                          threshold,
-                                                         sparseNum=10)
+                                                         sparseNum)
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
@@ -68,7 +69,7 @@ class TestProcessor(unittest.TestCase):
         targetIndxs = self.processor.applyReceptiveField(self.pShape,
                                                          self.attachedChC,
                                                          threshold,
-                                                         sparseNum=10)
+                                                         sparseNum)
         print(targetIndxs)
         assert len(targetIndxs) == 10
 
@@ -138,6 +139,8 @@ class TestProcessor(unittest.TestCase):
         assert dist == 3
 
 
+    def test_internalMove(self):
+        pass
 
     def test_calcInterference(self):
         pass
