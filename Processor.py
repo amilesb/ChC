@@ -42,8 +42,9 @@ class Processor:
         Inputs:
         sparseType       - String: either 'Percent' or 'Exact' for target number
         sparseLow/High   - target sparsity level for extracted SDR
-        **kwargs         - dictionary with pShape (input_array), attachedChC,
-                           self.seq, self.topo
+        **kwargs         - dictionary with boolean flag for 'polygon' or 'target'
+                           object to be defined as pShape (input_array),
+                           attachedChC, self.seq, self.topo
 
         Returns:
         SDR              - extracted SDR
@@ -52,6 +53,8 @@ class Processor:
         # from kwargs
         if not pShape or not attachedChC:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
+
+        trueTargs = set(pShape.activeElements)
 
         # build ais
         self.AIS = AIS(pShape, attachedChC)
@@ -67,6 +70,8 @@ class Processor:
             sparseHigh = np.round(pShape.size*sparseHigh)
         elif sparseType == 'exact':
             sparseLow = sparseHigh
+        if sparseLow > len(trueTargs):
+            sparseLow = trueTargs
         sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
         targetIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
@@ -80,8 +85,23 @@ class Processor:
         self.countEXTERNAL_MOVE += 1
 
         ##### change contrast REPEAt
+        correctTargsFound = set()
 
-        foundTargs = [targ for targ in targetIndxs]
+        suspectedTargs = set(targ for targ in targetIndxs)
+        correctTargs = suspectedTargs & trueTargs
+        incorrect = suspectedTargs - trueTargs
+
+        if len(correctTargs) >= sparseLow:
+            return trueTargs
+        else:
+            correctTargsFound.add(correctTargs)
+
+        randH_Start = np.random.randint(pShape.MAX_INPUT)
+        randH_Stop = np.random.randint(pShape.MAX_INPUT)       
+        randVert = np.random.randint(pShape.MAX_INPUT)
+        pShape.create_Gradient(is_horizontal=True, stop=randHoriz)
+        pShape.create_Gradient(is_horizontal=False, stop=randVert)
+
 
 
         for i in range(5):

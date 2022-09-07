@@ -99,8 +99,6 @@ class Polygon:
         rr, cc = polygon_perimeter(rr, cc, shape=self.input_array.shape,
                                    clip=False)
         self.input_array[rr, cc] = self.MAX_INPUT
-        print('rr', rr)
-        print('cc', cc)
         [self.activeElements.append((r, c)) for r, c in zip(rr, cc) if (r, c) not in self.activeElements]
         if display:
             self.display_Polygon(self.input_array, angle=self.angle,
@@ -133,7 +131,7 @@ class Polygon:
 
         return self.input_array
 
-    def create_Gradient(self, is_horizontal, start=None, stop=None, width=None):
+    def create_Gradient(self, is_horizontal, start=None, stop=None):
         '''Return gradient across the image in either the horizontal or vertical
         dimension.  Note if run twice- once for horizontal and once for vertical
         will produce a diagonal gradient.  Furthermore, by manipulating start
