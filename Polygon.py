@@ -131,27 +131,41 @@ class Polygon:
 
         return self.input_array
 
-    def create_Gradient(self, is_horizontal, start=None, stop=None):
+    def create_Gradient(self, is_horizontal, gradStart=None, gradStop=None,
+                        rowStart=0, colStart=0):
         '''Return gradient across the image in either the horizontal or vertical
         dimension.  Note if run twice- once for horizontal and once for vertical
-        will produce a diagonal gradient.  Furthermore, by manipulating start
-        and stop to different values can create any amount of diagonal gradient.
+        will produce a diagonal gradient.  Furthermore, by manipulating gradStart
+        and gradStop to different values can create any amount of diagonal gradient.
         Default option is to apply 50% gradient i.e. 0-127 on 255 grayscale.'''
         array = np.asarray(self.input_array, dtype=np.float64)
         height = array.shape[0]
         width = array.shape[1]
-        if not start:
-            start = 0
-        if not stop:
-            stop = self.MAX_INPUT//2
+        if not gradStart:
+            gradStart = 0
+        if not gradStop:
+            gradStop = self.MAX_INPUT//2
         if is_horizontal:
-            gradient = np.tile(np.linspace(start, stop, width), (height, 1))
+            gradient = np.tile(np.linspace(gradStart, gradStop, width), (height, 1))
+            if rowStart > 0:
+                widthToEnd = width-rowStart
+                tempEnd = gradient[:, 0:widthToEnd]
+                tempStart = gradient[:, widthToEnd:width]
+                gradient[:, rowStart:] = tempEnd
+                gradient[:, 0:rowStart] = tempStart
         else:
-            gradient = np.tile(np.linspace(start, stop, height), (width, 1)).T
+            gradient = np.tile(np.linspace(gradStart, gradStop, height), (width, 1)).T
+            if colStart > 0:
+                heightToEnd = height-colStart
+                tempEnd = gradient[0:heightToEnd, :]
+                tempStart = gradient[heightToEnd:height, :]
+                gradient[heightToEnd:, :] = tempEnd
+                gradient[0:heightToEnd, :] = tempStart
         self.input_array += gradient
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
 
         return self.input_array
+
 
     def add_Noise(self, scale=1):
         '''Add Gaussian noise to each array element to simulate effect of
