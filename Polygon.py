@@ -149,18 +149,18 @@ class Polygon:
             gradient = np.tile(np.linspace(gradStart, gradStop, width), (height, 1))
             if rowStart > 0:
                 widthToEnd = width-rowStart
-                tempEnd = gradient[:, 0:widthToEnd]
-                tempStart = gradient[:, widthToEnd:width]
+                tempEnd = gradient[:, 0:widthToEnd].copy()
+                tempStart = gradient[:, widthToEnd:width].copy()
                 gradient[:, rowStart:] = tempEnd
                 gradient[:, 0:rowStart] = tempStart
         else:
             gradient = np.tile(np.linspace(gradStart, gradStop, height), (width, 1)).T
             if colStart > 0:
                 heightToEnd = height-colStart
-                tempEnd = gradient[0:heightToEnd, :]
-                tempStart = gradient[heightToEnd:height, :]
-                gradient[heightToEnd:, :] = tempEnd
-                gradient[0:heightToEnd, :] = tempStart
+                tempEnd = gradient[0:heightToEnd, :].copy()
+                tempStart = gradient[heightToEnd:height, :].copy()
+                gradient[colStart:, :] = tempEnd
+                gradient[0:colStart, :] = tempStart
         self.input_array += gradient
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
 

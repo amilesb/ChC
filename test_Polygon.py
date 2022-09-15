@@ -66,8 +66,8 @@ class TestPoly(unittest.TestCase):
         self.grad = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
                                             y = 5, width=8, height=6, angle = 0)
         self.grad.insert_Polygon()
-        # self.grad.create_Gradient(is_horizontal=True, gradStart=0, gradStop=127,
-        #                           rowStart=5)
+        self.grad.create_Gradient(is_horizontal=True, gradStart=0, gradStop=127,
+                                  rowStart=5)
         self.grad.create_Gradient(is_horizontal=False, gradStart=0, gradStop=127,
                                   colStart=8)
         print(f'''Testing an embedded rectangle with a gradient applied along
