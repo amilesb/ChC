@@ -58,18 +58,14 @@ class TestProcessor(unittest.TestCase):
         # chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         # avgInputValInRF = np.mean(self.intValArray)
         # threshold[:] = avgInputValInRF/chcStep
-        targetIndxs = self.processor.applyReceptiveField(self.pShape,
-                                                         self.attachedChC,
-                                                         threshold,
-                                                         sparseNum)
+        self.processor.pShape = self.pShape
+        self.processor.attachedChC = self.attachedChC
+        targetIndxs = self.processor.applyReceptiveField(threshold, sparseNum)
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
-        targetIndxs = self.processor.applyReceptiveField(self.pShape,
-                                                         self.attachedChC,
-                                                         threshold,
-                                                         sparseNum)
+        targetIndxs = self.processor.applyReceptiveField(threshold, sparseNum)
         print(targetIndxs)
         assert len(targetIndxs) == 10
 

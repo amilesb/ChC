@@ -70,19 +70,17 @@ class Processor:
         threshold[:] = -1
 
         if sparseType=='Percent':
-            sparseLow = np.round(pShape.size*sparseLow)
-            sparseHigh = np.round(pShape.size*sparseHigh)
+            sparseLow = np.round(self.pShape.size*sparseLow)
+            sparseHigh = np.round(self.pShape.size*sparseHigh)
         elif sparseType == 'exact':
             sparseLow = sparseHigh
         if sparseLow > len(trueTargs):
             sparseLow = trueTargs
         sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
-        targetIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
-                                               sparseNum)
+        targetIndxs = self.applyReceptiveField(threshold, sparseNum)
 
-        targetIndxs = self.internalMove(pShape, attachedChC, threshold,
-                                        sparseNum, targetIndxs)
+        targetIndxs = self.internalMove(threshold, sparseNum, targetIndxs)
 
         if self.internalNoiseFlag:
             pass
@@ -102,15 +100,13 @@ class Processor:
                 return correctTargsFound
 
             correctTargsFound.add(correctTargs)
-            self.simulateExternalMove(pShape)
-            newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
-                                                sparseNum)
-            newIndxs = self.internalMove(pShape, attachedChC, threshold,
-                                         sparseNum, targetIndxs)
+            self.simulateExternalMove(self.pShape)
+            newIndxs = self.applyReceptiveField(threshold, sparseNum)
+            newIndxs = self.internalMove(threshold, sparseNum, targetIndxs)
 
 
         for i in range(5):
-            input_array = pShape.add_Noise()
+            input_array = self.pShape.add_Noise()
             pShape.input_array = input_array
             newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
                                                 sparseNum)
@@ -196,15 +192,12 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, pShape, attachedChC, threshold, sparseNum,
-                            prevTargetsFound=0, oscFlag=0):
+    def applyReceptiveField(self, threshold, sparseNum, prevTargetsFound=0,
+                            oscFlag=0):
         ''' Recursive BIG function returns an array of the same size as the
         receptive field filtered by the threshold i.e. generates an SDR!
 
         Inputs:
-        pShape           - Polygon object
-        attachedChC      - ChC object representing map of array coordinates
-                           to connected chandelier cells
         threshold        - np array of float values to compare against input
         sparseNum        - dictionary with desired number (low/high) of targets
         prevTargetsFound - float
@@ -216,11 +209,11 @@ class Processor:
 
         self.countAPPLY_RF += 1
 
-        input_array = pShape.input_array
-        array_MAX = pShape.MAX_INPUT
+        input_array = self.pShape.input_array
+        array_MAX = self.pShape.MAX_INPUT
         avgInputValInRF = np.mean(input_array)
         avgPercFR_of_RF_arrayMAX = avgInputValInRF/array_MAX
-        chcStep = array_MAX/attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         if threshold.any() < 0:
             threshold[:] = avgInputValInRF/chcStep
 
@@ -228,8 +221,8 @@ class Processor:
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
             for j in range(input_array.shape[1]):
-                weight = attachedChC.total_Active_Weight(PyC_array_element=(i,j),
-                                                         avgPercentFR_RF=avgPercFR_of_RF_arrayMAX)
+                weight = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
+                                                              avgPercentFR_RF=avgPercFR_of_RF_arrayMAX)
                 weight -= self.AIS.ais[i, j]
                 if weight < 0:
                     weight = 0
@@ -269,8 +262,8 @@ class Processor:
 
         prevTargetsFound = targetsFound
 
-        return self.applyReceptiveField(pShape, attachedChC, threshold,
-                                        sparseNum, prevTargetsFound, oscFlag)
+        return self.applyReceptiveField(threshold, sparseNum, prevTargetsFound,
+                                        oscFlag)
 
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):
@@ -342,15 +335,12 @@ class Processor:
         return dist
 
 
-    def internalMove(pShape, attachedChC, threshold, sparseNum, targetIndxs):
+    def internalMove(threshold, sparseNum, targetIndxs):
         '''Internal movement to sift out noise.  Note this is a recursive
         function built on top of another recursive function
         (applyReceptiveField).
 
         Inputs:
-        pShape           - Polygon object
-        attachedChC      - ChC object representing map of array coordinates
-                           to connected chandelier cells
         threshold        - np array of float values to compare against input
         sparseNum        - dictionary with desired number (low/high) of targets
         targetIndxs      - list of indices of input cells above the (direct
@@ -368,48 +358,46 @@ class Processor:
         for i in range(5):
             # input_array = pShape.add_Noise()
             # pShape.input_array = input_array
-            pShape.add_Noise()
-            newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
-                                                sparseNum)
+            self.pShape.add_Noise()
+            newIndxs = self.applyReceptiveField(threshold, sparseNum)
             falseTargsDueToNoise.append(set(newIndxs) ^ set(targetIndxs))
             targetIndxs = [val for val in targetIndxs if val in newIndxs]
 
         targetsFound = len(targetIndxs)
 
         if (sparseNum['low'] <= targetsFound <= sparseNum['high']):
-            pShape.input_array = originalInput
+            self.pShape.input_array = originalInput
             return targetIndxs
         else:
             for falseTarg in falseTargsDueToNoise:
                 self.AIS.ais[falseTarg[0], falseTarg[1]] = 0 # place ais at cell body
-                threshold[falseTarg[0], falseTarg[1]] += 0.1*pShape.MAX_INPUT # inhibit these cells
-            pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
-            targetIndxs = self.applyReceptiveField(pShape, attachedChC,
-                                                   threshold, sparseNum)
+                threshold[falseTarg[0], falseTarg[1]] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
+            self.pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
+            targetIndxs = self.applyReceptiveField(threshold, sparseNum)
             if np.count_nonzero(self.AIS.ais) <= sparseNum['high']:
                 self.internalNoiseFlag = True
                 return targetIndxs
-            return self.internalMove(pShape, attachedChC, threshold, sparseNum)
+            return self.internalMove(threshold, sparseNum)
 
 
-    def simulateExternalMove(self, pShape):
+    def simulateExternalMove(self):
         '''Helper function to adjust contrast across input space.'''
 
-        randFirst = np.random.randint(0, pShape.MAX_INPUT)
-        randSecond = np.random.randint(0, pShape.MAX_INPUT-randFirst)
-        rowStart = np.random.randint(0, pShape.input_array.shape[1])
-        colStart = np.random.randint(0, pShape.input_array.shape[0])
+        randFirst = np.random.randint(0, self.pShape.MAX_INPUT)
+        randSecond = np.random.randint(0, self.pShape.MAX_INPUT-randFirst)
+        rowStart = np.random.randint(0, self.pShape.input_array.shape[1])
+        colStart = np.random.randint(0, self.pShape.input_array.shape[0])
 
         if np.random.randint(0, 2) == 0:
-            pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
-                                   rowStart=rowStart)
-            pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-                                   colStart=colStart)
+            self.pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
+                                        rowStart=rowStart)
+            self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+                                        colStart=colStart)
         else:
-            pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
-                                   colStart=colStart)
-            pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-                                   rowStart=rowStart)
+            self.pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
+                                        colStart=colStart)
+            self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+                                        rowStart=rowStart)
 
         return
 
