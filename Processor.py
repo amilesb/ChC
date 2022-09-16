@@ -10,7 +10,20 @@ from collections import Counter
 from ChC import ChC
 from Polygon import Polygon
 
-
+#### To do write tests internal and external move simulateExternalMove and test_extractSDR
+#### Run experiment 1!!!!!
+# story:
+# 1) find targs
+# 2) use sequence memory to find faster
+#     a) sparse levels overlapping so multiple sdrs activated
+# 3) representations need topography as if random then overlapping
+#     will compete north south versus north and northeast so harder for sequence
+#     memory to assist in narrowing search
+# 4) generate firing rate output
+#     a) discuss temporal coding as mainstream but segway into interference
+#     b) note also if sdr is hit strong 18/20 synapses = strong output but if hit
+#        weak say 12/20 then maybe low output firing rate
+# 5) topography
 
 class Processor:
 
@@ -22,12 +35,10 @@ class Processor:
         regenerate an analog output which can then cycle through the process
         hierarchically.''')
 
-    def __init__(self):#, encoder, input_array):
+    def __init__(self):
         ''''''
 
         # self.input_array = input_array
-
-        ## use ChC total synapse weight to apply self.threshold chcStep to input
         self.REC_FLD_LENGTH = 4
         self.maxFiringRateOutput = 255
         self.countAPPLY_RF = 0
@@ -35,9 +46,9 @@ class Processor:
         self.countEXTERNAL_MOVE = 0
         self.internalNoiseFlag = False
         self.correctTargsFound = Counter() # keeps track of targets found at any point in search
+        self.falseTargsFound = Counter() # keeps track of false positives at any point in search
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
-        pass
 
     def extractSDR(self, sparseType, sparseLow=0.02, sparseHigh=0.04, **kwargs):
         ''' Top level function to take an input and run through the network.
@@ -59,7 +70,6 @@ class Processor:
 
         self.pShape = pShape
         self.attachedChC = attachedChC
-
         self.trueTargs = set(pShape.activeElements)
 
         # build ais
@@ -89,25 +99,7 @@ class Processor:
             ###### Need to implement REWIRING!!
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
-        while True:
-            # self.inspectTargetIndxs(targetIndxs, trueTargs)
-            # correctTargsFound = set()
-            suspectedTargs = set(targ for targ in targetIndxs)
-            correctTargs = suspectedTargs & self.trueTargs
-            incorrect = suspectedTargs - self.trueTargs
 
-            if len(correctTargs) >= sparseLow:
-                return True, correctTargs
-            if len(self.correctTargsFound) >= sparseLow:
-                return False, correctTargs
-                #make this a dictionary that coutns number of times each one found
-
-            self.correctTargsFound.update(correctTargs)
-            self.simulateExternalMove(self.pShape)
-            newIndxs = self.applyReceptiveField()
-            newIndxs = self.internalMove(newIndxs)
-
-            return self.externalMove(newIndxs)
 
 
         # self.externalMove()
@@ -200,7 +192,6 @@ class Processor:
         if self.threshold.any() < 0:
             self.threshold[:] = avgInputValInRF/chcStep
 
-
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
             for j in range(input_array.shape[1]):
@@ -242,7 +233,6 @@ class Processor:
                 self.adjustThreshold(binaryInputPiece, 'down')
             else:
                 oscFlag += 1
-
 
         prevTargetsFound = targetsFound
 
@@ -348,6 +338,7 @@ class Processor:
 
         if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
             self.pShape.input_array = originalInput
+            self.internalNoiseFlag = False
             return targetIndxs
         else:
             for falseTarg in falseTargsDueToNoise:
@@ -356,9 +347,45 @@ class Processor:
             self.pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
             targetIndxs = self.applyReceptiveField()
             if np.count_nonzero(self.AIS.ais) <= self.sparseNum['high']:
+                self.pShape.input_array = originalInput
                 self.internalNoiseFlag = True
                 return targetIndxs
             return self.internalMove(targetIndxs)
+
+
+    def externalMove(self, targetIndxs):
+        '''External movement to simulate changing gradients across input space.
+        Note this is a recursive function built on top of 2 nested recursive
+        functions (internalMove and applyReceptiveField).
+
+        Inputs:
+        targetIndxs      - list of indices of input cells above the (direct
+                           AIS/ChC modulated) and (indirect dynamic -- meant to
+                           simulate AIS length changing) self.threshold
+
+        Returns:
+        targetIndxs      - list of row, col indices for found targets
+        '''
+        while True:
+            suspectedTargs = set(targ for targ in targetIndxs)
+            correctTargs = suspectedTargs & self.trueTargs
+            incorrect = suspectedTargs - self.trueTargs
+
+            self.correctTargsFound.update(correctTargs)
+            self.falseTargsFound.update(incorrect)
+
+            if len(correctTargs) >= sparseLow:
+                return True, correctTargs
+            if len(self.correctTargsFound) >= sparseLow:
+                return False, correctTargs
+
+            self.simulateExternalMove(self.pShape)
+            newIndxs = self.applyReceptiveField()
+            newIndxs = self.internalMove(newIndxs)
+
+            self.countEXTERNAL_MOVE += 1
+
+            return self.externalMove(newIndxs)
 
 
     def simulateExternalMove(self):

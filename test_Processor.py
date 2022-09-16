@@ -142,6 +142,16 @@ class TestProcessor(unittest.TestCase):
                     return targetIndxs
                     '''
 
+
+    def test_externalMove(self):
+        pass
+
+
+    def test_simulateExternalMove(self):
+        pass
+
+
+
     def test_calcInterference(self):
         pass
 
