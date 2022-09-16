@@ -60,12 +60,13 @@ class TestProcessor(unittest.TestCase):
         # threshold[:] = avgInputValInRF/chcStep
         self.processor.pShape = self.pShape
         self.processor.attachedChC = self.attachedChC
-        targetIndxs = self.processor.applyReceptiveField(threshold, sparseNum)
+        self.processor.threshold = threshold
+        targetIndxs = self.processor.applyReceptiveField(sparseNum)
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
-        targetIndxs = self.processor.applyReceptiveField(threshold, sparseNum)
+        targetIndxs = self.processor.applyReceptiveField(sparseNum)
         print(targetIndxs)
         assert len(targetIndxs) == 10
 
@@ -97,9 +98,7 @@ class TestProcessor(unittest.TestCase):
         self.processor.threshold[9:] = 5
 
         for direction in ['up', 'down']:
-            self.processor.adjustThreshold(binaryInputPiece,
-                                           self.processor.threshold,
-                                           direction)
+            self.processor.adjustThreshold(binaryInputPiece, direction)
 
             for i in range(10):
                 for j in range(10):
