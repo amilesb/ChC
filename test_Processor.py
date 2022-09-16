@@ -32,7 +32,7 @@ class TestProcessor(unittest.TestCase):
         #                              [3, 3, 3, 1, 0, 5, 5, 5, 5, 5],
         #                              [0, 1, 3, 0, 1, 9 ,9, 9, 9, 9],
         #                              [1, 3, 2, 1, 1, 9, 9, 9, 9, 9],
-        #                              [3, 3, 3, 1, 0, 9, 9, 9, 9, 9],
+        #                              [3,sparseNum 3, 3, 1, 0, 9, 9, 9, 9, 9],
         #                              [1, 3, 2, 1, 1, 9, 9, 9, 9, 9],
         #                              [3, 3, 3, 1, 0, 9, 9, 9, 9, 9],
         #                              [1, 3, 1, 0, 1, 5, 5, 5, 5, 5]])
@@ -54,19 +54,19 @@ class TestProcessor(unittest.TestCase):
         self.pShape.input_array = self.intValArray
         threshold = np.ndarray((self.intValArray.shape[0], self.intValArray.shape[1]))
         threshold[0, 0] = -1
-        sparseNum = {'low': 10, 'high': 10}
+        self.processor.sparseNum = {'low': 10, 'high': 10}
         # chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         # avgInputValInRF = np.mean(self.intValArray)
         # threshold[:] = avgInputValInRF/chcStep
         self.processor.pShape = self.pShape
         self.processor.attachedChC = self.attachedChC
         self.processor.threshold = threshold
-        targetIndxs = self.processor.applyReceptiveField(sparseNum)
+        targetIndxs = self.processor.applyReceptiveField()
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
-        targetIndxs = self.processor.applyReceptiveField(sparseNum)
+        targetIndxs = self.processor.applyReceptiveField()
         print(targetIndxs)
         assert len(targetIndxs) == 10
 

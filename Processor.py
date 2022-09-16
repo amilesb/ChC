@@ -5,6 +5,7 @@ import numpy as np
 import os.path
 import pickle
 import scipy.stats as stats
+from collections import Counter
 
 from ChC import ChC
 from Polygon import Polygon
@@ -33,7 +34,7 @@ class Processor:
         self.countINTERNAL_MOVE = 0
         self.countEXTERNAL_MOVE = 0
         self.internalNoiseFlag = False
-        self.correctTargsFound = set() # set to keep track of targets found at any point in search
+        self.correctTargsFound = Counter() # keeps track of targets found at any point in search
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
         pass
@@ -77,17 +78,17 @@ class Processor:
             sparseLow = sparseHigh
         if sparseLow > len(trueTargs):
             sparseLow = trueTargs
-        sparseNum = {'low': sparseLow, 'high': sparseHigh}
+        self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
-        targetIndxs = self.applyReceptiveField(sparseNum)
+        targetIndxs = self.applyReceptiveField()
 
-        targetIndxs = self.internalMove(sparseNum, targetIndxs)
+        targetIndxs = self.internalMove(targetIndxs)
 
         if self.internalNoiseFlag:
             pass
             ###### Need to implement REWIRING!!
 
-        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs, sparseNum)
+        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
         while True:
             # self.inspectTargetIndxs(targetIndxs, trueTargs)
             # correctTargsFound = set()
@@ -96,14 +97,17 @@ class Processor:
             incorrect = suspectedTargs - self.trueTargs
 
             if len(correctTargs) >= sparseLow:
-                return self.trueTargs
+                return True, correctTargs
             if len(self.correctTargsFound) >= sparseLow:
-                return correctTargsFound
+                return False, correctTargs
+                #make this a dictionary that coutns number of times each one found
 
-            self.correctTargsFound.add(correctTargs)
+            self.correctTargsFound.update(correctTargs)
             self.simulateExternalMove(self.pShape)
-            newIndxs = self.applyReceptiveField(sparseNum)
-            newIndxs = self.internalMove(sparseNum, newIndxs)
+            newIndxs = self.applyReceptiveField()
+            newIndxs = self.internalMove(newIndxs)
+
+            return self.externalMove(newIndxs)
 
 
         # self.externalMove()
@@ -174,12 +178,11 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, sparseNum, prevTargetsFound=0, oscFlag=0):
+    def applyReceptiveField(self, prevTargetsFound=0, oscFlag=0):
         ''' Recursive BIG function returns an array of the same size as the
         receptive field filtered by the self.threshold i.e. generates an SDR!
 
         Inputs:
-        sparseNum        - dictionary with desired number (low/high) of targets
         prevTargetsFound - float
         oscFlag          - Flag to prevent infinite recursion
 
@@ -211,7 +214,8 @@ class Processor:
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)
 
-        if (sparseNum['low'] <= targetsFound <= sparseNum['high']) or oscFlag == 100:
+        if ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
+              or oscFlag == 100 ):
             row, col = self.getNonzeroIndices(binaryInputPiece)
             targetIndxs = [(r, c) for r, c in zip(row, col)]
             return targetIndxs
@@ -225,16 +229,16 @@ class Processor:
 
         # Note AIS moves opposite to self.threshold; decrease AIS means closer to cell body
         # i.e. increase ChC which can affect output
-        if targetsFound > sparseNum['high']:
+        if targetsFound > self.sparseNum['high']:
             self.moveAIS(binaryInputPiece, 'decrease')
-            if prevTargetsFound > sparseNum['high']: # assume gradient; punish those at the higher end
+            if prevTargetsFound > self.sparseNum['high']: # assume gradient; punish those at the higher end
                 self.adjustThreshold(binaryInputPiece, 'up')
             else:
                 oscFlag += 1
-        if targetsFound < sparseNum['low']:
+        if targetsFound < self.sparseNum['low']:
             binaryInvert = 1-binaryInputPiece
             self.moveAIS(binaryInvert, 'increase')
-            if prevTargetsFound < sparseNum['low']: # assume gradient; boost those at the lowest end
+            if prevTargetsFound < self.sparseNum['low']: # assume gradient; boost those at the lowest end
                 self.adjustThreshold(binaryInputPiece, 'down')
             else:
                 oscFlag += 1
@@ -242,7 +246,7 @@ class Processor:
 
         prevTargetsFound = targetsFound
 
-        return self.applyReceptiveField(sparseNum, prevTargetsFound, oscFlag)
+        return self.applyReceptiveField(prevTargetsFound, oscFlag)
 
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):
@@ -314,13 +318,12 @@ class Processor:
         return dist
 
 
-    def internalMove(sparseNum, targetIndxs):
+    def internalMove(targetIndxs):
         '''Internal movement to sift out noise.  Note this is a recursive
         function built on top of another recursive function
         (applyReceptiveField).
 
         Inputs:
-        sparseNum        - dictionary with desired number (low/high) of targets
         targetIndxs      - list of indices of input cells above the (direct
                            AIS/ChC modulated) and (indirect dynamic -- meant to
                            simulate AIS length changing) self.threshold
@@ -337,13 +340,13 @@ class Processor:
             # input_array = pShape.add_Noise()
             # pShape.input_array = input_array
             self.pShape.add_Noise()
-            newIndxs = self.applyReceptiveField(sparseNum)
+            newIndxs = self.applyReceptiveField()
             falseTargsDueToNoise.append(set(newIndxs) ^ set(targetIndxs))
             targetIndxs = [val for val in targetIndxs if val in newIndxs]
 
         targetsFound = len(targetIndxs)
 
-        if (sparseNum['low'] <= targetsFound <= sparseNum['high']):
+        if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
             self.pShape.input_array = originalInput
             return targetIndxs
         else:
@@ -351,11 +354,11 @@ class Processor:
                 self.AIS.ais[falseTarg[0], falseTarg[1]] = 0 # place ais at cell body
                 self.threshold[falseTarg[0], falseTarg[1]] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
             self.pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
-            targetIndxs = self.applyReceptiveField(sparseNum)
-            if np.count_nonzero(self.AIS.ais) <= sparseNum['high']:
+            targetIndxs = self.applyReceptiveField()
+            if np.count_nonzero(self.AIS.ais) <= self.sparseNum['high']:
                 self.internalNoiseFlag = True
                 return targetIndxs
-            return self.internalMove(sparseNum, targetIndxs)
+            return self.internalMove(targetIndxs)
 
 
     def simulateExternalMove(self):
