@@ -32,6 +32,7 @@ class Processor:
         self.countAPPLY_RF = 0
         self.countINTERNAL_MOVE = 0
         self.countEXTERNAL_MOVE = 0
+        self.internalNoiseFlag = False
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
         pass
@@ -54,13 +55,16 @@ class Processor:
         if not pShape or not attachedChC:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
 
-        trueTargs = set(pShape.activeElements)
+        self.pShape = pShape
+        self.attachedChC = attachedChC
+
+        self.trueTargs = set(pShape.activeElements)
 
         # build ais
         self.AIS = AIS(pShape, attachedChC)
 
-        fldHEIGHT = pShape.input_array.shape[0]
-        fldWIDTH = pShape.input_array.shape[1]
+        fldHEIGHT = self.pShape.input_array.shape[0]
+        fldWIDTH = self.pShape.input_array.shape[1]
         intValArray = np.zeros(fldHEIGHT, fldWIDTH)
         threshold = np.zeros((fldHEIGHT, fldWIDTH))
         threshold[:] = -1
@@ -80,28 +84,29 @@ class Processor:
         targetIndxs = self.internalMove(pShape, attachedChC, threshold,
                                         sparseNum, targetIndxs)
 
+        if self.internalNoiseFlag:
+            pass
+            ###### Need to implement REWIRING!!
 
-############
-        self.countEXTERNAL_MOVE += 1
+        sdrFoundWholeFlag, targetIndxs = self.externalMove()
+        while True:
+            # self.inspectTargetIndxs(targetIndxs, trueTargs)
+            correctTargsFound = set()
+            suspectedTargs = set(targ for targ in targetIndxs)
+            correctTargs = suspectedTargs & trueTargs
+            incorrect = suspectedTargs - trueTargs
 
-        ##### change contrast REPEAt
-        correctTargsFound = set()
+            if len(correctTargs) >= sparseLow:
+                return trueTargs
+            if len(correctTargsFound) >= sparseLow:
+                return correctTargsFound
 
-        suspectedTargs = set(targ for targ in targetIndxs)
-        correctTargs = suspectedTargs & trueTargs
-        incorrect = suspectedTargs - trueTargs
-
-        if len(correctTargs) >= sparseLow:
-            return trueTargs
-        else:
             correctTargsFound.add(correctTargs)
-
-        randH_Start = np.random.randint(pShape.MAX_INPUT)
-        randH_Stop = np.random.randint(pShape.MAX_INPUT)       
-        randVert = np.random.randint(pShape.MAX_INPUT)
-        pShape.create_Gradient(is_horizontal=True, stop=randHoriz)
-        pShape.create_Gradient(is_horizontal=False, stop=randVert)
-
+            self.simulateExternalMove(pShape)
+            newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
+                                                sparseNum)
+            newIndxs = self.internalMove(pShape, attachedChC, threshold,
+                                         sparseNum, targetIndxs)
 
 
         for i in range(5):
@@ -138,8 +143,7 @@ class Processor:
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
 
-        if objectToTrain == 'seq':elf.applyReceptiveField
-
+        if objectToTrain == 'seq':
             self.seq.evalActiveColsVersusPreds(winningColumnsInd)
 
         if objectToTrain == 'topo':
@@ -173,11 +177,9 @@ class Processor:
                 numTargets = np.floor(array_size*0.02)
             pShape = Target(array_size, numTargets, numClusters)
             pShape.insert_Targets()
-
         else:
             pShape = Polygon(array_size=array_size, form=form, x=x, y=y, width=wd,
                              height=ht, angle=angle)
-
             pShape.insert_Polygon()
 
         if os.path.exists(f'ChC_handles/ChC_size_{array_size}'):
@@ -360,27 +362,57 @@ class Processor:
         '''
 
         self.countINTERNAL_MOVE += 1
+        originalInput = pShape.input_array
 
         falseTargsDueToNoise = []
         for i in range(5):
-            input_array = pShape.add_Noise()
-            pShape.input_array = input_array
+            # input_array = pShape.add_Noise()
+            # pShape.input_array = input_array
+            pShape.add_Noise()
             newIndxs = self.applyReceptiveField(pShape, attachedChC, threshold,
                                                 sparseNum)
             falseTargsDueToNoise.append(set(newIndxs) ^ set(targetIndxs))
-            targetIndxs = [val for val in targetIndxs if value in newIndxs]
+            targetIndxs = [val for val in targetIndxs if val in newIndxs]
 
         targetsFound = len(targetIndxs)
 
         if (sparseNum['low'] <= targetsFound <= sparseNum['high']):
+            pShape.input_array = originalInput
             return targetIndxs
         else:
             for falseTarg in falseTargsDueToNoise:
                 self.AIS.ais[falseTarg[0], falseTarg[1]] = 0 # place ais at cell body
                 threshold[falseTarg[0], falseTarg[1]] += 0.1*pShape.MAX_INPUT # inhibit these cells
-                targetIndxs = self.applyReceptiveField(pShape, attachedChC,
-                                                       threshold, sparseNum)
-                return self.internalMove(pShape, attachedChC, threshold, sparseNum)
+            pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
+            targetIndxs = self.applyReceptiveField(pShape, attachedChC,
+                                                   threshold, sparseNum)
+            if np.count_nonzero(self.AIS.ais) <= sparseNum['high']:
+                self.internalNoiseFlag = True
+                return targetIndxs
+            return self.internalMove(pShape, attachedChC, threshold, sparseNum)
+
+
+    def simulateExternalMove(self, pShape):
+        '''Helper function to adjust contrast across input space.'''
+
+        randFirst = np.random.randint(0, pShape.MAX_INPUT)
+        randSecond = np.random.randint(0, pShape.MAX_INPUT-randFirst)
+        rowStart = np.random.randint(0, pShape.input_array.shape[1])
+        colStart = np.random.randint(0, pShape.input_array.shape[0])
+
+        if np.random.randint(0, 2) == 0:
+            pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
+                                   rowStart=rowStart)
+            pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+                                   colStart=colStart)
+        else:
+            pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
+                                   colStart=colStart)
+            pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+                                   rowStart=rowStart)
+
+        return
+
 
 
     def calcInterference(self, result, threshold):

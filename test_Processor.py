@@ -141,6 +141,11 @@ class TestProcessor(unittest.TestCase):
 
     def test_internalMove(self):
         pass
+        ''' test whether the reset is needed
+                if (sparseNum['low'] <= targetsFound <= sparseNum['high']):
+                    pShape.input_array = originalInput  ### RESET ###
+                    return targetIndxs
+                    '''
 
     def test_calcInterference(self):
         pass

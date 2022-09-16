@@ -164,7 +164,7 @@ class Polygon:
         self.input_array += gradient
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
 
-        return self.input_array
+        return 
 
 
     def add_Noise(self, scale=1):
