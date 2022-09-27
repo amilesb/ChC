@@ -49,6 +49,9 @@ class Processor:
         self.falseTargsFound = Counter() # keeps track of false positives at any point in search
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
         # num_receptive_fields = stride**2 # 1024
+        self.sparseNum = {}
+        self.pShape = Polygon(array_size=10, x=3, y=3)
+        self.pShape.insert_Polygon()
 
     def extractSDR(self, sparseType, sparseLow=0.02, sparseHigh=0.04, **kwargs):
         ''' Top level function to take an input and run through the network.
@@ -308,7 +311,7 @@ class Processor:
         return dist
 
 
-    def internalMove(targetIndxs):
+    def internalMove(self, targetIndxs):
         '''Internal movement to sift out noise.  Note this is a recursive
         function built on top of another recursive function
         (applyReceptiveField).
@@ -323,15 +326,16 @@ class Processor:
         '''
 
         self.countINTERNAL_MOVE += 1
-        originalInput = pShape.input_array
+        originalInput = self.pShape.input_array
 
         falseTargsDueToNoise = []
         for i in range(5):
-            # input_array = pShape.add_Noise()
-            # pShape.input_array = input_array
             self.pShape.add_Noise()
             newIndxs = self.applyReceptiveField()
-            falseTargsDueToNoise.append(set(newIndxs) ^ set(targetIndxs))
+            falseTargs = set(newIndxs) ^ set(targetIndxs)
+            for falseTarg in falseTargs:
+                if falseTarg not in falseTargsDueToNoise:
+                    falseTargsDueToNoise.append(falseTarg)
             targetIndxs = [val for val in targetIndxs if val in newIndxs]
 
         targetsFound = len(targetIndxs)
@@ -342,12 +346,11 @@ class Processor:
             return targetIndxs
         else:
             for falseTarg in falseTargsDueToNoise:
-                self.AIS.ais[falseTarg[0], falseTarg[1]] = 0 # place ais at cell body
-                self.threshold[falseTarg[0], falseTarg[1]] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
+                self.AIS.ais[falseTarg] = 0 # place ais at cell body
+                self.threshold[falseTarg] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
             self.pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
             targetIndxs = self.applyReceptiveField()
             if np.count_nonzero(self.AIS.ais) <= self.sparseNum['high']:
-                self.pShape.input_array = originalInput
                 self.internalNoiseFlag = True
                 return targetIndxs
             return self.internalMove(targetIndxs)

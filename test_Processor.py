@@ -67,7 +67,7 @@ class TestProcessor(unittest.TestCase):
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
         targetIndxs = self.processor.applyReceptiveField()
-        print(targetIndxs)
+        print('test_applyReceptiveField', targetIndxs)
         assert len(targetIndxs) == 10
 
 
@@ -133,14 +133,28 @@ class TestProcessor(unittest.TestCase):
 
         assert dist == 3
 
+    @mock.patch('Processor.Processor.applyReceptiveField')
+    def test_internalMove(self, mockedApply):
+        mockedApply.return_value = [(i, i) for i in range(5, 10)]
+        self.processor.pShape.input_array = np.ones((10, 10))
+        self.processor.threshold = np.ones((10, 10))
+        indxs = [(i, i) for i in range(5)]
+        self.processor.sparseNum['low'] = 4 # force internalMove to enter else statement on first pass
+        self.processor.sparseNum['high'] = 20
 
-    def test_internalMove(self):
-        pass
-        ''' test whether the reset is needed
-                if (sparseNum['low'] <= targetsFound <= sparseNum['high']):
-                    pShape.input_array = originalInput  ### RESET ###
-                    return targetIndxs
-                    '''
+        targetIndxs = self.processor.internalMove(indxs)
+
+        assert targetIndxs == [(i, i) for i in range(5, 10)]
+        assert self.processor.internalNoiseFlag == False
+
+        for i in range(10):
+            for j in range(10):
+                if (i, j) not in mockedApply.return_value:
+                    mockedApply.return_value.append((i, j))
+        self.processor.sparseNum['low'] = 21 # force internal move to rely on safety exit of recursion
+        targetIndxs = self.processor.internalMove(indxs)
+        assert len(targetIndxs) == self.processor.pShape.input_array.size
+        assert self.processor.internalNoiseFlag == True
 
 
     def test_externalMove(self):
