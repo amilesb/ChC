@@ -67,7 +67,7 @@ class TestProcessor(unittest.TestCase):
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
         targetIndxs = self.processor.applyReceptiveField()
-        print('test_applyReceptiveField', targetIndxs)
+        # print('test_applyReceptiveField', targetIndxs)
         assert len(targetIndxs) == 10
 
 
@@ -139,7 +139,8 @@ class TestProcessor(unittest.TestCase):
         self.processor.pShape.input_array = np.ones((10, 10))
         self.processor.threshold = np.ones((10, 10))
         indxs = [(i, i) for i in range(5)]
-        self.processor.sparseNum['low'] = 4 # force internalMove to enter else statement on first pass
+        # TEST1 force internalMove to enter else block on first pass; then after first recursion pass the if criteria
+        self.processor.sparseNum['low'] = 4
         self.processor.sparseNum['high'] = 20
 
         targetIndxs = self.processor.internalMove(indxs)
@@ -151,18 +152,42 @@ class TestProcessor(unittest.TestCase):
             for j in range(10):
                 if (i, j) not in mockedApply.return_value:
                     mockedApply.return_value.append((i, j))
-        self.processor.sparseNum['low'] = 21 # force internal move to rely on safety exit of recursion
+        # TEST2 force internal move to rely on safety exit of recursion
+        self.processor.sparseNum['low'] = 21
         targetIndxs = self.processor.internalMove(indxs)
         assert len(targetIndxs) == self.processor.pShape.input_array.size
         assert self.processor.internalNoiseFlag == True
 
+    @mock.patch('Processor.Processor.internalMove')
+    @mock.patch('Processor.Processor.applyReceptiveField')
+    def test_externalMove(self, mockedApply, mockedInternal):
+        trueTargs = np.where(self.intValArray > 0, 1, 0)
+        row, col = self.processor.getNonzeroIndices(trueTargs)
+        trueTargs = [(r, c) for r, c in zip(row, col)]
+        self.processor.trueTargs = set(trueTargs)
 
-    def test_externalMove(self):
-        pass
+        mockedApply.return_value = []
+        mockedInternal.side_effect = [
+                                       [(i, i) for i in range(5, 10)],
+                                       self.processor.trueTargs,
+                                       trueTargs[0:4],
+                                       trueTargs[4:]
+                                     ]
+        self.processor.sparseNum['low'] = 10
+
+        # Test1 first if conditional
+        sdrTag, indxs = self.processor.externalMove([0, 0])
+        assert sdrTag == True
+        assert self.processor.countEXTERNAL_MOVE == 2
+
+        # Test2 second if conditional
+        self.processor.correctTargsFound.clear()
+        sdrTag, indxs = self.processor.externalMove([0, 0])
+        assert sdrTag == False
+        print(self.processor.countEXTERNAL_MOVE)
+        assert self.processor.countEXTERNAL_MOVE == 4
 
 
-    def test_simulateExternalMove(self):
-        pass
 
 
 

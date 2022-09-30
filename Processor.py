@@ -105,8 +105,6 @@ class Processor:
 
 
 
-        # self.externalMove()
-
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
         '''
@@ -114,6 +112,22 @@ class Processor:
         even though different in lower level but output next layer input is constant!!!
         note example using triangle in 2d but in reality is sdr in 3d and potentially
         covering n dims feature space!
+
+        BIG IDEA
+        Use count of how many times target found as proxy for confidence so if target
+        found 5 times versus others 1 or 2 times then bias network to look for sdr with that 1
+        hit 5 times
+        This lends to topography bc circuit i a m using is single column serially
+        touching but in reality array of columns so as col 1 moves away and col x
+        moves into its position, col 1 can only reliably relay its prediction to
+        col x if topoographical arrangement.
+
+        Also though imagine 2 sdr that are identical except all elements shifted over
+        1.  if input space underneath is random then they can represent totally different
+        things but topography then the overlap through the input space can be abstracted
+        away and used to teach other columns that have never seen that input!!!!!!!
+        Key idea is as explained above network biased with each movement towards the ones
+        that are more certain of being true i.e. 5 out of 5 hit right versus only once.
         '''
 
 
@@ -369,6 +383,9 @@ class Processor:
         Returns:
         targetIndxs      - list of row, col indices for found targets
         '''
+
+        originalInput = self.pShape.input_array
+
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
             correctTargs = suspectedTargs & self.trueTargs
@@ -377,16 +394,18 @@ class Processor:
             self.correctTargsFound.update(correctTargs)
             self.falseTargsFound.update(incorrect)
 
-            if len(correctTargs) >= sparseLow:
-                return True, correctTargs
-            if len(self.correctTargsFound) >= sparseLow:
-                return False, correctTargs
+            if len(correctTargs) >= self.sparseNum['low']:
+                return True, list(correctTargs)
+            if len(self.correctTargsFound) >= self.sparseNum['low']:
+                return False, list(correctTargs)
 
-            self.simulateExternalMove(self.pShape)
+            self.simulateExternalMove()
             newIndxs = self.applyReceptiveField()
             newIndxs = self.internalMove(newIndxs)
 
             self.countEXTERNAL_MOVE += 1
+
+            self.pShape.input_array = originalInput
 
             return self.externalMove(newIndxs)
 
