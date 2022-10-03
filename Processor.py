@@ -10,13 +10,14 @@ from collections import Counter
 from ChC import ChC
 from Polygon import Polygon
 
-#### To do write tests internal and external move simulateExternalMove and test_extractSDR
+#### To do write tests test_extractSDR
 #### Run experiment 1!!!!!
 # story:
 # 1) find targs
 # 2) use sequence memory to find faster
 #     a) sparse levels overlapping so multiple sdrs activated
 # 3) representations need topography as if random then overlapping
+#  for this fig. intentially set indexes to 1 over from true values internal move should find easily if topography but will struggle if random
 #     will compete north south versus north and northeast so harder for sequence
 #     memory to assist in narrowing search
 # 4) generate firing rate output
@@ -24,6 +25,29 @@ from Polygon import Polygon
 #     b) note also if sdr is hit strong 18/20 synapses = strong output but if hit
 #        weak say 12/20 then maybe low output firing rate
 # 5) topography
+
+        '''
+        output dynamically shapes input receptive field so narrow triangle and wide triangle
+        even though different in lower level but output next layer input is constant!!!
+        note example using triangle in 2d but in reality is sdr in 3d and potentially
+        covering n dims feature space!
+
+        BIG IDEA
+        Use count of how many times target found as proxy for confidence so if target
+        found 5 times versus others 1 or 2 times then bias network to look for sdr with that 1
+        hit 5 times
+        This lends to topography bc circuit i am using is single column serially
+        touching but in reality array of columns so as col 1 moves away and col x
+        moves into its position, col 1 can only reliably relay its prediction to
+        col x if topoographical arrangement.
+
+        Also though imagine 2 sdr that are identical except all elements shifted over
+        1.  if input space underneath is random then they can represent totally different
+        things but topography then the overlap through the input space can be abstracted
+        away and used to teach other columns that have never seen that input!!!!!!!
+        Key idea is as explained above network biased with each movement towards the ones
+        that are more certain of being true i.e. 5 out of 5 hit right versus only once.
+        '''
 
 class Processor:
 
@@ -103,33 +127,7 @@ class Processor:
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
 
-
-
         # firingRateOutput = self.calcInterference(result, self.threshold)
-
-        '''
-        output dynamically shapes input receptive field so narrow triangle and wide triangle
-        even though different in lower level but output next layer input is constant!!!
-        note example using triangle in 2d but in reality is sdr in 3d and potentially
-        covering n dims feature space!
-
-        BIG IDEA
-        Use count of how many times target found as proxy for confidence so if target
-        found 5 times versus others 1 or 2 times then bias network to look for sdr with that 1
-        hit 5 times
-        This lends to topography bc circuit i a m using is single column serially
-        touching but in reality array of columns so as col 1 moves away and col x
-        moves into its position, col 1 can only reliably relay its prediction to
-        col x if topoographical arrangement.
-
-        Also though imagine 2 sdr that are identical except all elements shifted over
-        1.  if input space underneath is random then they can represent totally different
-        things but topography then the overlap through the input space can be abstracted
-        away and used to teach other columns that have never seen that input!!!!!!!
-        Key idea is as explained above network biased with each movement towards the ones
-        that are more certain of being true i.e. 5 out of 5 hit right versus only once.
-        '''
-
 
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
