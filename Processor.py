@@ -7,7 +7,7 @@ import pickle
 import scipy.stats as stats
 from collections import Counter
 
-from ChC import ChC
+from ChC import ChC, AIS
 from Polygon import Polygon
 
 #### To do write tests test_extractSDR
@@ -26,28 +26,28 @@ from Polygon import Polygon
 #        weak say 12/20 then maybe low output firing rate
 # 5) topography
 
-        '''
-        output dynamically shapes input receptive field so narrow triangle and wide triangle
-        even though different in lower level but output next layer input is constant!!!
-        note example using triangle in 2d but in reality is sdr in 3d and potentially
-        covering n dims feature space!
+'''
+output dynamically shapes input receptive field so narrow triangle and wide triangle
+even though different in lower level but output next layer input is constant!!!
+note example using triangle in 2d but in reality is sdr in 3d and potentially
+covering n dims feature space!
 
-        BIG IDEA
-        Use count of how many times target found as proxy for confidence so if target
-        found 5 times versus others 1 or 2 times then bias network to look for sdr with that 1
-        hit 5 times
-        This lends to topography bc circuit i am using is single column serially
-        touching but in reality array of columns so as col 1 moves away and col x
-        moves into its position, col 1 can only reliably relay its prediction to
-        col x if topoographical arrangement.
+BIG IDEA
+Use count of how many times target found as proxy for confidence so if target
+found 5 times versus others 1 or 2 times then bias network to look for sdr with that 1
+hit 5 times
+This lends to topography bc circuit i am using is single column serially
+touching but in reality array of columns so as col 1 moves away and col x
+moves into its position, col 1 can only reliably relay its prediction to
+col x if topoographical arrangement.
 
-        Also though imagine 2 sdr that are identical except all elements shifted over
-        1.  if input space underneath is random then they can represent totally different
-        things but topography then the overlap through the input space can be abstracted
-        away and used to teach other columns that have never seen that input!!!!!!!
-        Key idea is as explained above network biased with each movement towards the ones
-        that are more certain of being true i.e. 5 out of 5 hit right versus only once.
-        '''
+Also though imagine 2 sdr that are identical except all elements shifted over
+1.  if input space underneath is random then they can represent totally different
+things but topography then the overlap through the input space can be abstracted
+away and used to teach other columns that have never seen that input!!!!!!!
+Key idea is as explained above network biased with each movement towards the ones
+that are more certain of being true i.e. 5 out of 5 hit right versus only once.
+'''
 
 class Processor:
 
@@ -60,7 +60,7 @@ class Processor:
         hierarchically.''')
 
     def __init__(self):
-        ''''''
+        '''B'''
 
         # self.input_array = input_array
         self.REC_FLD_LENGTH = 4
@@ -69,6 +69,8 @@ class Processor:
         self.countINTERNAL_MOVE = 0
         self.countEXTERNAL_MOVE = 0
         self.internalNoiseFlag = False
+        self.targsINTERNAL = Counter()
+        self.suspectFalseTargsInternal = Counter()
         self.correctTargsFound = Counter() # keeps track of targets found at any point in search
         self.falseTargsFound = Counter() # keeps track of false positives at any point in search
         # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
@@ -77,22 +79,28 @@ class Processor:
         self.pShape = Polygon(array_size=10, x=3, y=3)
         self.pShape.insert_Polygon()
 
-    def extractSDR(self, sparseType, sparseLow=0.02, sparseHigh=0.04, **kwargs):
+    def extractSDR(self, sparseType, *args, sparseLow=0.02, sparseHigh=0.04):
         ''' Top level function to take an input and run through the network.
 
         Inputs:
         sparseType       - String: either 'Percent' or 'Exact' for target number
         sparseLow/High   - target sparsity level for extracted SDR
-        **kwargs         - dictionary with boolean flag for 'polygon' or 'target'
-                           object to be defined as pShape (input_array),
+        *args            - object to be defined as pShape (input_array),
                            attachedChC, self.seq, self.topo
 
         Returns:
         SDR              - extracted SDR
+        sdrFoundWholeFlag- Boolean indicating that if true then indexes
+                           corresponding to SDR match the lower bound of ground
+                           truth indices.  If false, targetIndxs will be
+                           incomplete i.e. less than sparse lower bound
+                           indicating ambiguity.
         '''
 
-        # from kwargs
-        if not pShape or not attachedChC:
+        # from args
+        try:
+            pShape or attachedChC
+        except NameError:
             pShape, attachedChC = self.buildPolygonAndAttachChC()
 
         self.pShape = pShape
@@ -104,7 +112,7 @@ class Processor:
 
         fldHEIGHT = self.pShape.input_array.shape[0]
         fldWIDTH = self.pShape.input_array.shape[1]
-        intValArray = np.zeros(fldHEIGHT, fldWIDTH)
+        intValArray = np.zeros((fldHEIGHT, fldWIDTH))
         self.threshold = np.zeros((fldHEIGHT, fldWIDTH))
         self.threshold[:] = -1
 
@@ -113,8 +121,8 @@ class Processor:
             sparseHigh = np.round(self.pShape.size*sparseHigh)
         elif sparseType == 'exact':
             sparseLow = sparseHigh
-        if sparseLow > len(trueTargs):
-            sparseLow = trueTargs
+        if sparseLow > len(self.trueTargs):
+            sparseLow = self.trueTargs
         self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
         targetIndxs = self.applyReceptiveField()
@@ -132,11 +140,14 @@ class Processor:
         # if not self.seq:
         #     self.seq = Sequencer(self.sp)
 
-        if objectToTrain == 'seq':
-            self.seq.evalActiveColsVersusPreds(winningColumnsInd)
+        # if objectToTrain == 'seq':
+        #     self.seq.evalActiveColsVersusPreds(winningColumnsInd)
+        #
+        # if objectToTrain == 'topo':
+        #     self.trainTopo()
 
-        if objectToTrain == 'topo':
-            self.trainTopo()
+
+        return sdrFoundWholeFlag, targetIndxs
 
 
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
@@ -339,16 +350,21 @@ class Processor:
 
         self.countINTERNAL_MOVE += 1
         originalInput = self.pShape.input_array
+        self.targsINTERNAL.update(targetIndxs)
 
-        falseTargsDueToNoise = []
         for i in range(5):
+            self.pShape.input_array = originalInput # restore input
             self.pShape.add_Noise()
             newIndxs = self.applyReceptiveField()
-            falseTargs = set(newIndxs) ^ set(targetIndxs)
-            for falseTarg in falseTargs:
-                if falseTarg not in falseTargsDueToNoise:
-                    falseTargsDueToNoise.append(falseTarg)
-            targetIndxs = [val for val in targetIndxs if val in newIndxs]
+            self.targsINTERNAL.update(newIndxs)
+
+        suspectedFalseTargsDueToNoise = []
+        targetIndxs = []
+        for targ in self.targsINTERNAL:
+            if self.targsINTERNAL[targ] < 3:
+                suspectedFalseTargsDueToNoise.append(targ)
+            else:
+                targetIndxs.append(targ)
 
         targetsFound = len(targetIndxs)
 
@@ -357,15 +373,27 @@ class Processor:
             self.internalNoiseFlag = False
             return targetIndxs
         else:
-            for falseTarg in falseTargsDueToNoise:
-                self.AIS.ais[falseTarg] = 0 # place ais at cell body
-                self.threshold[falseTarg] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
-            self.pShape.input_array = originalInput # now restore input to re-process with noisy input cells thresholded out
+            # self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
+            self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
+            self.pShape.input_array = originalInput # restore input to re-process with noisy input cells thresholded out
             targetIndxs = self.applyReceptiveField()
-            if np.count_nonzero(self.AIS.ais) <= self.sparseNum['high']:
+            if len(self.targsINTERNAL) > self.sparseNum['high']:
                 self.internalNoiseFlag = True
+                bestGuess = self.targsINTERNAL.most_common(self.sparseNum['low'])
+                targetIndxs = []
+                for indxAndCount in bestGuess:
+                    targetIndxs.append(indxAndCount[0])
                 return targetIndxs
-            return self.internalMove(targetIndxs)
+            else:
+                return self.internalMove(targetIndxs)
+
+
+    def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
+        '''Helper function to remove suspected false targets from consideration.'''
+
+        for falseTarg in suspectedFalseTargsDueToNoise:
+            self.AIS.ais[falseTarg] = 0 # place ais at cell body
+            self.threshold[falseTarg] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
 
 
     def externalMove(self, targetIndxs):
@@ -374,12 +402,17 @@ class Processor:
         functions (internalMove and applyReceptiveField).
 
         Inputs:
-        targetIndxs      - list of indices of input cells above the (direct
-                           AIS/ChC modulated) and (indirect dynamic -- meant to
-                           simulate AIS length changing) self.threshold
+        targetIndxs       - list of indices of input cells above the (direct
+                            AIS/ChC modulated) and (indirect dynamic -- meant to
+                            simulate AIS length changing) self.threshold
 
         Returns:
-        targetIndxs      - list of row, col indices for found targets
+        targetIndxs       - list of row, col indices for found targets
+        sdrFoundWholeFlag - Boolean indicating that if true then indexes
+                            corresponding to SDR match the lower bound of ground
+                            truth indices.  If false, targetIndxs will be
+                            incomplete i.e. less than sparse lower bound
+                            indicating ambiguity.
         '''
 
         originalInput = self.pShape.input_array
@@ -399,6 +432,7 @@ class Processor:
 
             self.simulateExternalMove()
             newIndxs = self.applyReceptiveField()
+            self.targsINTERNAL.clear() # reset internal counter
             newIndxs = self.internalMove(newIndxs)
 
             self.countEXTERNAL_MOVE += 1

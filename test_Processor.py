@@ -26,6 +26,10 @@ class TestProcessor(unittest.TestCase):
                                      [0, 0, 0, 0, 0, 0, 0, 0, 9, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+        trueTargs = np.where(self.intValArray > 0, 1, 0)
+        row, col = self.processor.getNonzeroIndices(trueTargs)
+        trueTargs = [(r, c) for r, c in zip(row, col)]
+        self.processor.trueTargs = set(trueTargs)
         # self.intValArray = np.array([[1, 1, 2, 2, 2, 5, 5, 5, 5, 5],
         #                              [0, 1, 3, 0, 1, 5 ,5, 5, 5, 5],
         #                              [1, 3, 2, 1, 1, 5, 5, 5, 5, 5],
@@ -38,7 +42,14 @@ class TestProcessor(unittest.TestCase):
         #                              [1, 3, 1, 0, 1, 5, 5, 5, 5, 5]])
     def test_extractSDR(self):
         # this represents an end to end test bc it is the master function call
-        pass
+        flag, targetIndxs = self.processor.extractSDR('exact', self.pShape,
+                                                      self.attachedChC,
+                                                      sparseHigh=10)
+
+        assert flag == True
+        for targ in targetIndxs:
+            assert targ in self.processor.trueTargs
+        assert len(targetIndxs) == 10
 
 
     def test_buildPolygonAndAttachChC(self):
@@ -133,16 +144,16 @@ class TestProcessor(unittest.TestCase):
 
         assert dist == 3
 
+
     @mock.patch('Processor.Processor.applyReceptiveField')
     def test_internalMove(self, mockedApply):
         mockedApply.return_value = [(i, i) for i in range(5, 10)]
         self.processor.pShape.input_array = np.ones((10, 10))
         self.processor.threshold = np.ones((10, 10))
         indxs = [(i, i) for i in range(5)]
-        # TEST1 force internalMove to enter else block on first pass; then after first recursion pass the if criteria
         self.processor.sparseNum['low'] = 4
         self.processor.sparseNum['high'] = 20
-
+        # TEST1 (initial if block for exit) start with indices (0,0)-(4,4) need to find (5,5)-(9,9)
         targetIndxs = self.processor.internalMove(indxs)
 
         assert targetIndxs == [(i, i) for i in range(5, 10)]
@@ -155,8 +166,10 @@ class TestProcessor(unittest.TestCase):
         # TEST2 force internal move to rely on safety exit of recursion
         self.processor.sparseNum['low'] = 21
         targetIndxs = self.processor.internalMove(indxs)
-        assert len(targetIndxs) == self.processor.pShape.input_array.size
+
+        assert len(targetIndxs) == self.processor.sparseNum['low']
         assert self.processor.internalNoiseFlag == True
+
 
     @mock.patch('Processor.Processor.internalMove')
     @mock.patch('Processor.Processor.applyReceptiveField')
@@ -184,7 +197,7 @@ class TestProcessor(unittest.TestCase):
         self.processor.correctTargsFound.clear()
         sdrTag, indxs = self.processor.externalMove([0, 0])
         assert sdrTag == False
-        print(self.processor.countEXTERNAL_MOVE)
+        # print('test external move: count external move', self.processor.countEXTERNAL_MOVE)
         assert self.processor.countEXTERNAL_MOVE == 4
 
 
