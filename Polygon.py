@@ -164,7 +164,7 @@ class Polygon:
         self.input_array += gradient
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
 
-        return 
+        return
 
 
     def add_Noise(self, scale=1):
@@ -200,6 +200,7 @@ class Target(Polygon):
         self.MAX_INPUT = 255
         self.activeElements = []
 
+
     def insert_Targets(self):
         ''' Inserts specified number of targets into a numpy array.'''
 
@@ -207,11 +208,11 @@ class Target(Polygon):
         dimY = self.input_array.shape[1]
         numTargets = self.numTargets
 
-        try:
-            targsPerCluster, remaining = divmod(self.numTargets, self.numClusters)
-        except ZeroDivisionError:
+        if self.numClusters == 0:
             targsPerCluster = 1
             remaining = 0
+        else:
+            targsPerCluster, remaining = divmod(self.numTargets, self.numClusters)
 
         while numTargets > 0:
             row = np.random.randint(dimX)

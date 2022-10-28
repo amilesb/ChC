@@ -8,7 +8,7 @@ import scipy.stats as stats
 from collections import Counter
 
 from ChC import ChC, AIS
-from Polygon import Polygon
+from Polygon import Polygon, Target
 
 #### To do write tests test_extractSDR
 #### Run experiment 1!!!!!
@@ -79,14 +79,15 @@ class Processor:
         self.pShape = Polygon(array_size=10, x=3, y=3)
         self.pShape.insert_Polygon()
 
-    def extractSDR(self, sparseType, *args, sparseLow=0.02, sparseHigh=0.04):
+    def extractSDR(self, sparseType, sparseLow=0.02, sparseHigh=0.04, **kwargs):
         ''' Top level function to take an input and run through the network.
 
         Inputs:
         sparseType       - String: either 'Percent' or 'Exact' for target number
         sparseLow/High   - target sparsity level for extracted SDR
-        *args            - object to be defined as pShape (input_array),
-                           attachedChC, self.seq, self.topo
+        *kwargs          - object to be defined as pShape (input_array),
+                           attachedChC, self.seq, self.topo or parameters to
+                           build polygon and attachedChC
 
         Returns:
         SDR              - extracted SDR
@@ -101,7 +102,7 @@ class Processor:
         try:
             pShape or attachedChC
         except NameError:
-            pShape, attachedChC = self.buildPolygonAndAttachChC()
+            pShape, attachedChC = self.buildPolygonAndAttachChC(**kwargs)
 
         self.pShape = pShape
         self.attachedChC = attachedChC
@@ -119,10 +120,10 @@ class Processor:
         if sparseType=='Percent':
             sparseLow = np.round(self.pShape.size*sparseLow)
             sparseHigh = np.round(self.pShape.size*sparseHigh)
-        elif sparseType == 'exact':
+        elif sparseType == 'Exact':
             sparseLow = sparseHigh
         if sparseLow > len(self.trueTargs):
-            sparseLow = self.trueTargs
+            sparseLow = len(self.trueTargs)
         self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
         targetIndxs = self.applyReceptiveField()
