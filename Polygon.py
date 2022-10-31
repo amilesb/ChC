@@ -18,7 +18,7 @@ class Polygon:
                f' {self.input_array.shape} at angle {self.angle}')
 
     def __init__(self, array_size=128, form='rectangle', x=0, y=0,
-                 width=5, height=5, angle=0):
+                 width=5, height=5, angle=0, maxInput=255):
         self.input_array = np.zeros([array_size,array_size])
         self.cx = np.floor(width/2)
         self.cy = np.floor(height/2)
@@ -26,7 +26,7 @@ class Polygon:
         self.y = y
         self.angle = angle
         self.form = form
-        self.MAX_INPUT = 255
+        self.MAX_INPUT = maxInput
         self.activeElements = []
 
     def create_Simple_Polygon(self, form):
@@ -176,7 +176,7 @@ class Polygon:
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
         # self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
-        return 
+        return
 
     def countActiveElements(self):
         return np.count_nonzero(self.input_array)
@@ -190,14 +190,14 @@ class Target(Polygon):
         return (f'An array of size {self.input_array.shape} with '
                 f'{self.numTargets} active elements inserted.')
 
-    def __init__(self, array_size=32, numTargets=20, numClusters=0):
+    def __init__(self, array_size=32, numTargets=20, numClusters=0, maxInput=255):
         self.input_array = np.zeros([array_size,array_size])
         self.numTargets = numTargets
         if numTargets<numClusters:
             self.numClusters = numTargets
         else:
             self.numClusters = numClusters
-        self.MAX_INPUT = 255
+        self.MAX_INPUT = maxInput
         self.activeElements = []
 
 
