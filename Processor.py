@@ -155,7 +155,7 @@ class Processor:
     def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
                                  y=4, wd=4, ht=3, angle=0,
                                  useTargetSubclass=False, numTargets=False,
-                                 numClusters=0):
+                                 numClusters=0, maxInput=255):
         '''Draw a polygon from the polygon class (numpy array) and then attach
         Chandelier Cells to that input.
 
@@ -177,7 +177,7 @@ class Processor:
         if useTargetSubclass:
             if not numTargets:
                 numTargets = np.floor(array_size*0.02)
-            pShape = Target(array_size, numTargets, numClusters)
+            pShape = Target(array_size, numTargets, numClusters, maxInput)
             pShape.insert_Targets()
         else:
             pShape = Polygon(array_size=array_size, form=form, x=x, y=y, width=wd,
