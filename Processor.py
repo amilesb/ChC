@@ -129,6 +129,7 @@ class Processor:
         targetIndxs = self.applyReceptiveField()
 
         targetIndxs = self.internalMove(targetIndxs)
+        # self.pShape.display_Polygon(self.pShape.input_array)
 
         if self.internalNoiseFlag:
             pass
@@ -350,14 +351,15 @@ class Processor:
         '''
 
         self.countINTERNAL_MOVE += 1
-        originalInput = self.pShape.input_array
+        originalInput = self.pShape.input_array.copy()
+
         self.targsINTERNAL.update(targetIndxs)
 
         for i in range(5):
-            self.pShape.input_array = originalInput # restore input
             self.pShape.add_Noise()
             newIndxs = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
+            self.pShape.input_array = originalInput.copy() # restore input
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
@@ -370,13 +372,12 @@ class Processor:
         targetsFound = len(targetIndxs)
 
         if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
-            self.pShape.input_array = originalInput
             self.internalNoiseFlag = False
             return targetIndxs
         else:
             # self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
             self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
-            self.pShape.input_array = originalInput # restore input to re-process with noisy input cells thresholded out
+            self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
             targetIndxs = self.applyReceptiveField()
             if len(self.targsINTERNAL) > self.sparseNum['high']:
                 self.internalNoiseFlag = True
@@ -416,7 +417,7 @@ class Processor:
                             indicating ambiguity.
         '''
 
-        originalInput = self.pShape.input_array
+        originalInput = self.pShape.input_array.copy()
 
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
@@ -438,7 +439,7 @@ class Processor:
 
             self.countEXTERNAL_MOVE += 1
 
-            self.pShape.input_array = originalInput
+            self.pShape.input_array = originalInput.copy()
 
             return self.externalMove(newIndxs)
 

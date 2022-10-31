@@ -176,7 +176,7 @@ class Polygon:
         self.input_array = np.clip(self.input_array, 0, self.MAX_INPUT)
         # self.display_Polygon(self.input_array, angle=self.angle, form=self.form)
 
-        return self.input_array
+        return 
 
     def countActiveElements(self):
         return np.count_nonzero(self.input_array)

@@ -12,14 +12,13 @@ def createFigure1():
 
     internal = []
     external = []
-    for i in range(2):
+    for i in range(10):
         P = Processor()
         sdrFoundWholeFlag, targetIndxs = P.extractSDR('Exact', sparseHigh=20,
                                                       array_size=16,
                                                       numTargets=20,
                                                       useTargetSubclass=True
                                                       )
-        P.pShape.display_Polygon(P.pShape.input_array)
         internal.append(P.countINTERNAL_MOVE)
         external.append(P.countEXTERNAL_MOVE)
 ##### figure out why second display is happening!!
@@ -27,7 +26,8 @@ def createFigure1():
     # ax.hist(internal)
     # ax.hist(external)
 
-
+    print('internal', internal)
+    print('external', external)
 
 
 
