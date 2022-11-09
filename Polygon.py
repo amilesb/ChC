@@ -129,7 +129,7 @@ class Polygon:
         # gaussian_filter is imported library function
         self.input_array = gaussian_filter(array, sigma)
 
-        return self.input_array
+        return
 
     def create_Gradient(self, is_horizontal, gradStart=None, gradStop=None,
                         rowStart=0, colStart=0):

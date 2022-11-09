@@ -98,11 +98,12 @@ class Processor:
                            indicating ambiguity.
         '''
 
-        # from args
-        try:
-            pShape or attachedChC
-        except NameError:
-            pShape, attachedChC = self.buildPolygonAndAttachChC(**kwargs)
+        if kwargs:
+            try:
+                pShape = kwargs.get('pShape')
+                attachedChC = kwargs.get('attachedChC')
+            except NameError:
+                pShape, attachedChC = self.buildPolygonAndAttachChC(**kwargs)
 
         self.pShape = pShape
         self.attachedChC = attachedChC
@@ -128,9 +129,9 @@ class Processor:
 
         targetIndxs = self.applyReceptiveField()
 
-        targetIndxs = self.internalMove(targetIndxs)
-        # self.pShape.display_Polygon(self.pShape.input_array)
-
+        print('finished applyRF')
+        targetIndxs, indxCounter = self.internalMove(targetIndxs)
+        print('finished internalMove')
         if self.internalNoiseFlag:
             pass
             ###### Need to implement REWIRING!!
@@ -336,7 +337,7 @@ class Processor:
         return dist
 
 
-    def internalMove(self, targetIndxs):
+    def internalMove(self, targetIndxs, indxCounter=None):
         '''Internal movement to sift out noise.  Note this is a recursive
         function built on top of another recursive function
         (applyReceptiveField).
@@ -353,41 +354,112 @@ class Processor:
         self.countINTERNAL_MOVE += 1
         originalInput = self.pShape.input_array.copy()
 
-        self.targsINTERNAL.update(targetIndxs)
+        # print('internal move', self.countINTERNAL_MOVE)
+        # print('starting function indxCounter', indxCounter)
+
+        if not indxCounter:
+            indxCounter = Counter()
+
+        # print('before update indxCounter', indxCounter)
+        indxCounter.update(targetIndxs)
+        # print('after update indx counter', indxCounter)
 
         for i in range(5):
             self.pShape.add_Noise()
             newIndxs = self.applyReceptiveField()
-            self.targsINTERNAL.update(newIndxs)
+            indxCounter.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
-        for targ in self.targsINTERNAL:
-            if self.targsINTERNAL[targ] < 3:
+        for targ in indxCounter:
+            if indxCounter[targ] < 3:
                 suspectedFalseTargsDueToNoise.append(targ)
             else:
                 targetIndxs.append(targ)
+
+        # if self.countINTERNAL_MOVE > 1:
+        #     print('length targs internal', len(indxCounter))
+        #     print('current target indexes', targetIndxs)
+        #     print('after internal move indx counter', indxCounter)
 
         targetsFound = len(targetIndxs)
 
         if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
             self.internalNoiseFlag = False
-            return targetIndxs
+            return targetIndxs, indxCounter
         else:
             # self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
             self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
             self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
             targetIndxs = self.applyReceptiveField()
-            if len(self.targsINTERNAL) > self.sparseNum['high']:
+            if len(indxCounter) > self.sparseNum['high']:
                 self.internalNoiseFlag = True
-                bestGuess = self.targsINTERNAL.most_common(self.sparseNum['low'])
+                bestGuess = indxCounter.most_common(self.sparseNum['low'])
                 targetIndxs = []
                 for indxAndCount in bestGuess:
                     targetIndxs.append(indxAndCount[0])
-                return targetIndxs
+                return targetIndxs, indxCounter
             else:
-                return self.internalMove(targetIndxs)
+                print('type', type(indxCounter))
+                _, indxCounter = self.internalMove(targetIndxs, indxCounter)
+
+
+
+
+        #
+        #
+        # self.countINTERNAL_MOVE += 1
+        # originalInput = self.pShape.input_array.copy()
+        #
+        # print('internal move', self.countINTERNAL_MOVE)
+        # print('before update targsInternal', self.targsINTERNAL)
+        # self.targsINTERNAL.update(targetIndxs)
+        # print('after update', self.targsINTERNAL)
+        #
+        # if not indxCounter:
+        #     indxCounter = Counter()
+        #
+        # for i in range(5):
+        #     self.pShape.add_Noise()
+        #     newIndxs = self.applyReceptiveField()
+        #     # self.targsINTERNAL.update(newIndxs)
+        #
+        #     indxCounter.update(newIndxs)
+        #
+        #     self.pShape.input_array = originalInput.copy() # restore input
+        #
+        # suspectedFalseTargsDueToNoise = []
+        # targetIndxs = []
+        # for targ in self.targsINTERNAL:
+        #     if self.targsINTERNAL[targ] < 3:
+        #         suspectedFalseTargsDueToNoise.append(targ)
+        #     else:
+        #         targetIndxs.append(targ)
+        #
+        # if self.countINTERNAL_MOVE > 1:
+        #     print('length targs internal', len(self.targsINTERNAL))
+        #     print('current target indexes', targetIndxs)
+        #
+        # targetsFound = len(targetIndxs)
+        #
+        # if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
+        #     self.internalNoiseFlag = False
+        #     return targetIndxs
+        # else:
+        #     # self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
+        #     self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
+        #     self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
+        #     targetIndxs = self.applyReceptiveField()
+        #     if len(self.targsINTERNAL) > self.sparseNum['high']:
+        #         self.internalNoiseFlag = True
+        #         bestGuess = self.targsINTERNAL.most_common(self.sparseNum['low'])
+        #         targetIndxs = []
+        #         for indxAndCount in bestGuess:
+        #             targetIndxs.append(indxAndCount[0])
+        #         return targetIndxs
+        #     else:
+        #         return self.internalMove(targetIndxs)
 
 
     def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
@@ -418,6 +490,7 @@ class Processor:
         '''
 
         originalInput = self.pShape.input_array.copy()
+        print('targetindxs external move', targetIndxs)
 
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
@@ -435,7 +508,7 @@ class Processor:
             self.simulateExternalMove()
             newIndxs = self.applyReceptiveField()
             self.targsINTERNAL.clear() # reset internal counter
-            newIndxs = self.internalMove(newIndxs)
+            newIndxs, indxCounter = self.internalMove(newIndxs)
 
             self.countEXTERNAL_MOVE += 1
 

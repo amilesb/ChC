@@ -3,6 +3,7 @@ generate plots for research paper.'''
 
 import numpy as np
 from matplotlib import pyplot as plt
+import time
 
 from Processor import Processor
 
@@ -10,24 +11,54 @@ from Processor import Processor
 
 def createFigure1():
 
+    applyRF = []
     internal = []
     external = []
-    for i in range(10):
-        P = Processor()
-        sdrFoundWholeFlag, targetIndxs = P.extractSDR('Exact', sparseHigh=20,
-                                                      array_size=16,
-                                                      numTargets=20,
-                                                      useTargetSubclass=True
-                                                      )
-        internal.append(P.countINTERNAL_MOVE)
-        external.append(P.countEXTERNAL_MOVE)
+    applyRF_N = []
+    internalN = []
+    externalN = []
+
+    standardizedInputs = dict(array_size=32, numTargets=20,
+                              useTargetSubclass=True, maxInput=101)
+
+
+
+    for i in range(9):
+        start = time.time()
+        # Simple setup - no noise, blurring, or gradient
+        # P = Processor()
+        # sdrFoundWholeFlag, targetIndxs = P.extractSDR('Exact', sparseHigh=20,
+        #                                               **standardizedInputs
+        #                                               )
+        # internal.append(P.countINTERNAL_MOVE)
+        # external.append(P.countEXTERNAL_MOVE)
+
+        # Setup - with noise and blurring but no gradient
+        P_Noise = Processor()
+        pShape, attachedChC = P_Noise.buildPolygonAndAttachChC(**standardizedInputs)
+        pShape.blur_Array()
+        pShape.add_Noise(scale=i+1)
+        sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR('Exact',
+                                                            sparseHigh=20,
+                                                            pShape=pShape,
+                                                            attachedChC=attachedChC
+                                                           )
+        applyRF_N.append(P_Noise.countAPPLY_RF)
+        internalN.append(P_Noise.countINTERNAL_MOVE)
+        externalN.append(P_Noise.countEXTERNAL_MOVE)
+
+        end = time.time()
+        print(f'time for noise with standard deviation equal to {i+1} added: {end-start:.1f}s')
+
+
 ##### figure out why second display is happening!!
     # fig, ax = plt.subplots(figsize=(10, 10))
     # ax.hist(internal)
     # ax.hist(external)
 
-    print('internal', internal)
-    print('external', external)
+    print('applyRF', applyRF_N)
+    print('internal', internalN)
+    print('external', externalN)
 
 
 
