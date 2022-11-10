@@ -19,11 +19,11 @@ def createFigure1():
     externalN = []
 
     standardizedInputs = dict(array_size=32, numTargets=20,
-                              useTargetSubclass=True, maxInput=101)
+                              useTargetSubclass=True, maxInput=63)
 
 
 
-    for i in range(9):
+    for i in range(7):
         start = time.time()
         # Simple setup - no noise, blurring, or gradient
         # P = Processor()
