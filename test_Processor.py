@@ -42,9 +42,10 @@ class TestProcessor(unittest.TestCase):
         #                              [1, 3, 1, 0, 1, 5, 5, 5, 5, 5]])
     def test_extractSDR(self):
         # this represents an end to end test bc it is the master function call
-        flag, targetIndxs = self.processor.extractSDR('exact', self.pShape,
-                                                      self.attachedChC,
-                                                      sparseHigh=10)
+        flag, targetIndxs = self.processor.extractSDR('Exact', sparseHigh=10,
+                                                      pShape=self.pShape,
+                                                      attachedChC=self.attachedChC,
+                                                      )
 
         assert flag == True
         for targ in targetIndxs:

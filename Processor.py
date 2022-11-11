@@ -119,13 +119,13 @@ class Processor:
         self.threshold[:] = -1
 
         if sparseType=='Percent':
-            sparseLow = np.round(self.pShape.size*sparseLow)
-            sparseHigh = np.round(self.pShape.size*sparseHigh)
+            sparseLow = int(np.round(self.pShape.size*sparseLow))
+            sparseHigh = int(np.round(self.pShape.size*sparseHigh))
         elif sparseType == 'Exact':
-            sparseLow = sparseHigh
+            sparseLow = int(sparseHigh)
         if sparseLow > len(self.trueTargs):
-            sparseLow = len(self.trueTargs)
-        self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
+            sparseLow = int(len(self.trueTargs))
+        self.sparseNum = {'low': sparseLow, 'high': sparseHigh})
 
         targetIndxs = self.applyReceptiveField()
 
