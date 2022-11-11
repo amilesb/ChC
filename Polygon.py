@@ -110,19 +110,14 @@ class Polygon:
 
     def display_Polygon(self, array, **kwargs): #angle, shape, polygon):
         '''For troubleshooting and guiding visual intuition.'''
-        if array.size > 1029:
+        if array.size > 1025:
             print(f'Array too big.  Array size is {array.shape}')
         else:
             if kwargs:
                 print(kwargs)
                 print('Array:')
                 print(array)
-            # img = Image.fromarray(np.uint8(array))
-            stackedArray = np.dstack([array, array, array])
-            print('yowza',stackedArray)
-            for x, y in self.activeElements:
-                stackedArray[x, y, :] = [255, 0, 0]
-            plt.imshow(np.uint8(array), cmap=grayscale)
+            plt.imshow(np.uint8(array), cmap='gray')
             plt.show()
             # for debugging:
             # img.save(f'test_{array.shape}_{kwargs["angle"]}_{kwargs["form"]}.png')
