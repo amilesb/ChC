@@ -125,7 +125,7 @@ class Processor:
             sparseLow = int(sparseHigh)
         if sparseLow > len(self.trueTargs):
             sparseLow = int(len(self.trueTargs))
-        self.sparseNum = {'low': sparseLow, 'high': sparseHigh})
+        self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
         targetIndxs = self.applyReceptiveField()
 
