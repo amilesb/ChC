@@ -19,7 +19,8 @@ def createFigure1():
     externalN = []
 
     standardizedInputs = dict(array_size=32, numTargets=20,
-                              useTargetSubclass=True, maxInput=63)
+                              useTargetSubclass=True, maxInput=63,
+                              useVariableTargValue=True)
 
 
 
@@ -36,8 +37,11 @@ def createFigure1():
         # Setup - with noise and blurring but no gradient
         P_Noise = Processor()
         pShape, attachedChC = P_Noise.buildPolygonAndAttachChC(**standardizedInputs)
-        pShape.blur_Array()
+        pShape.display_Polygon(pShape.input_array)
+        pShape.blur_Array(sigma=2)
+        pShape.display_Polygon(pShape.input_array)
         pShape.add_Noise(scale=i+1)
+        pShape.display_Polygon(pShape.input_array)
         sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR('Exact',
                                                             sparseHigh=20,
                                                             pShape=pShape,

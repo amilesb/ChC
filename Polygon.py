@@ -82,7 +82,7 @@ class Polygon:
         return polygon_vertices
 
     def insert_Polygon(self, complex=False, vert_number=False, Rmax=False,
-                       display=False):
+                       display=False, useVariableTargValue=False):
         ''' Inserts a polygon perimeter into a numpy array.'''
         if complex:
             poly = self.create_Complex_Shape(vert_number, Rmax)
@@ -98,7 +98,10 @@ class Polygon:
         # polygon_perimeter is an imported library function
         rr, cc = polygon_perimeter(rr, cc, shape=self.input_array.shape,
                                    clip=False)
-        self.input_array[rr, cc] = self.MAX_INPUT
+        if useVariableTargValue:
+            self.input_array[rr, cc] = np.random.randint(self.MAX_INPUT)
+        else:
+            self.input_array[rr, cc] = self.MAX_INPUT
         [self.activeElements.append((r, c)) for r, c in zip(rr, cc) if (r, c) not in self.activeElements]
         if display:
             self.display_Polygon(self.input_array, angle=self.angle,
@@ -200,7 +203,7 @@ class Target(Polygon):
         self.activeElements = []
 
 
-    def insert_Targets(self):
+    def insert_Targets(self, useVariableTargValue=False):
         ''' Inserts specified number of targets into a numpy array.'''
 
         dimX = self.input_array.shape[0]
@@ -230,7 +233,10 @@ class Target(Polygon):
                 continue
 
             while numTargsToInsert:
-                self.input_array[row, col] = self.MAX_INPUT
+                if useVariableTargValue:
+                    self.input_array[row, col] = np.random.randint(self.MAX_INPUT)
+                else:
+                    self.input_array[row, col] = self.MAX_INPUT
                 self.activeElements.append((row, col))
                 numTargets -= 1
                 numTargsToInsert -= 1
