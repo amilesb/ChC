@@ -215,23 +215,7 @@ class Processor:
 
         self.countAPPLY_RF += 1
 
-        input_array, arrayMAX, avgValInRF, RF_AvgToMax, chcStep = self.calcRF_Vars()
-
-        if self.threshold.any() < 0:
-            self.threshold[:] = avgValInRF/chcStep
-
-        result = np.zeros([input_array.shape[0], input_array.shape[1]])
-        for i in range(input_array.shape[0]):
-            for j in range(input_array.shape[1]):
-                weight = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
-                                                              avgPercentFR_RF=RF_AvgToMax)
-                weight -= self.AIS.ais[i, j]
-                if weight < 0:
-                    weight = 0
-                result[i, j] = max(input_array[(i,j)] - chcStep*weight, 0)
-        binaryInputPiece = np.where(result > self.threshold, 1, 0)
-
-        targetsFound = np.count_nonzero(binaryInputPiece > 0)
+        binaryInputPiece, targetsFound = self.applyThreshold()
 
         if ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
               or oscFlag == 100 ):
@@ -260,16 +244,44 @@ class Processor:
         return self.applyReceptiveField(prevTargetsFound, oscFlag)
 
 
-    def calcRF_Vars(self):
-        '''Helper function to calc simple metrics in RF.'''
+    def applyThreshold(self):
+        '''Threshold image according to ChCs.
 
+        Inputs:
+        input_array      - np array of input
+
+        Returns:
+        binaryInputPiece - np binary array of same size as input with value 1
+                           wherever input>threshold and 0 elsewhere
+        targetIndxs      - list of row, col indices for found targets
+
+        '''
+
+        # Calc basic metrics on input space
         input_array = self.pShape.input_array
         arrayMAX = self.pShape.MAX_INPUT
         avgValInRF = np.mean(input_array)
         RF_AvgToMax = avgValInRF/arrayMAX
         chcStep = arrayMAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
-        return input_array, arrayMAX, avgValInRF, RF_AvgToMax, chcStep
+        # Check/Set threshold
+        if self.threshold.any() < 0:
+            self.threshold[:] = avgValInRF/chcStep
+
+        result = np.zeros([input_array.shape[0], input_array.shape[1]])
+        for i in range(input_array.shape[0]):
+            for j in range(input_array.shape[1]):
+                weight = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
+                                                              avgPercentFR_RF=RF_AvgToMax)
+                weight -= self.AIS.ais[i, j]
+                if weight < 0:
+                    weight = 0
+                result[i, j] = max(input_array[(i,j)] - chcStep*weight, 0)
+        binaryInputPiece = np.where(result > self.threshold, 1, 0)
+
+        targetsFound = np.count_nonzero(binaryInputPiece > 0)
+
+        return binaryInputPiece, targetsFound
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):
         '''Helper function to get indices of nonzero elements and adjust AIS
