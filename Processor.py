@@ -4,7 +4,7 @@ form a regenerative hierarchically designed cycle.'''
 import numpy as np
 import os.path
 import pickle
-import scipy.stats as stats
+from scipy import stats, ndimage
 from collections import Counter
 
 from ChC import ChC, AIS
@@ -215,19 +215,16 @@ class Processor:
 
         self.countAPPLY_RF += 1
 
-        input_array = self.pShape.input_array
-        array_MAX = self.pShape.MAX_INPUT
-        avgInputValInRF = np.mean(input_array)
-        avgPercFR_of_RF_arrayMAX = avgInputValInRF/array_MAX
-        chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        input_array, arrayMAX, avgValInRF, RF_AvgToMax, chcStep = self.calcRF_Vars()
+
         if self.threshold.any() < 0:
-            self.threshold[:] = avgInputValInRF/chcStep
+            self.threshold[:] = avgValInRF/chcStep
 
         result = np.zeros([input_array.shape[0], input_array.shape[1]])
         for i in range(input_array.shape[0]):
             for j in range(input_array.shape[1]):
                 weight = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
-                                                              avgPercentFR_RF=avgPercFR_of_RF_arrayMAX)
+                                                              avgPercentFR_RF=RF_AvgToMax)
                 weight -= self.AIS.ais[i, j]
                 if weight < 0:
                     weight = 0
@@ -241,13 +238,6 @@ class Processor:
             row, col = self.getNonzeroIndices(binaryInputPiece)
             targetIndxs = [(r, c) for r, c in zip(row, col)]
             return targetIndxs
-
-        '''
-        # print('targs', targetsFound)
-        # print('self.threshold', self.threshold)
-        # print('chcStep', chcStep)
-        # print('binary', binaryInputPiece.nonzero())
-        '''
 
         # Note AIS moves opposite to self.threshold; decrease AIS means closer to cell body
         # i.e. increase ChC which can affect output
@@ -269,6 +259,17 @@ class Processor:
 
         return self.applyReceptiveField(prevTargetsFound, oscFlag)
 
+
+    def calcRF_Vars(self):
+        '''Helper function to calc simple metrics in RF.'''
+
+        input_array = self.pShape.input_array
+        arrayMAX = self.pShape.MAX_INPUT
+        avgValInRF = np.mean(input_array)
+        RF_AvgToMax = avgValInRF/arrayMAX
+        chcStep = arrayMAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+
+        return input_array, arrayMAX, avgValInRF, RF_AvgToMax, chcStep
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):
         '''Helper function to get indices of nonzero elements and adjust AIS

@@ -202,7 +202,8 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.countEXTERNAL_MOVE == 4
 
 
-
+    def test_calcRF_Vars(self):
+        pass
 
 
     def test_calcInterference(self):
