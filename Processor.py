@@ -217,6 +217,16 @@ class Processor:
 
         binaryInputPiece, targetsFound = self.applyThreshold()
 
+        if oscFlag%10 == 0:
+            filter = ndimage.uniform_filter(self.pShape.input_array,
+                                            size=oscFlag+3, mode='mirror')
+            normalized = self.pShape.input_array-filter
+            num = np.random.randint(self.sparseNum['low'], self.sparseNum['high'])
+            indxs = np.c_[np.unravel_index(np.argpartition(normalized.ravel(),-num)[-num:],normalized.shape)]
+            filterIndxs = [i for i in indxs]
+
+        # ADD IN IMAGE FILTER AND LOGIC WITH UNION OF TARGS FOUND!!
+
         if ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
               or oscFlag == 100 ):
             row, col = self.getNonzeroIndices(binaryInputPiece)
