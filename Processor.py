@@ -201,7 +201,8 @@ class Processor:
         return pShape, attachedChC
 
 
-    def applyReceptiveField(self, prevTargetsFound=0, oscFlag=0):
+    def applyReceptiveField(self, prevTargetsFound=0, oscFlag=0,
+                            filterIndxs=None):
         ''' Recursive BIG function returns an array of the same size as the
         receptive field filtered by the self.threshold i.e. generates an SDR!
 
@@ -215,7 +216,11 @@ class Processor:
 
         self.countAPPLY_RF += 1
 
+        weightsAIS = self.calcWeights()
+
         binaryInputPiece, targetsFound = self.applyThreshold()
+        row, col = self.getNonzeroIndices(binaryInputPiece)
+        targetIndxs = [(r, c) for r, c in zip(row, col)]
 
         if oscFlag%10 == 0:
             filter = ndimage.uniform_filter(self.pShape.input_array,
@@ -223,14 +228,19 @@ class Processor:
             normalized = self.pShape.input_array-filter
             num = np.random.randint(self.sparseNum['low'], self.sparseNum['high'])
             indxs = np.c_[np.unravel_index(np.argpartition(normalized.ravel(),-num)[-num:],normalized.shape)]
-            filterIndxs = [i for i in indxs]
+            filterIndxs = [tuple(x) for x in indxs.tolist()]
 
-        # ADD IN IMAGE FILTER AND LOGIC WITH UNION OF TARGS FOUND!!
+        likelyTargIndxs = list(set(filterIndxs) & set(targetIndxs))
+        possTargIndxs = list(set(filterIndxs) ^ set(targetIndxs))
 
-        if ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
+#  NOTE NEED FILTER INDXS when not provided from if statement i.e. in fxn argument?
+# can remove targetsFound!  but fix test file too
+        # ADD IN LOGIC WITH UNION OF TARGS FOUND!!
+
+        if ( (self.sparseNum['low'] <= len(likelyTargIndxs) <= self.sparseNum['high'])
               or oscFlag == 100 ):
-            row, col = self.getNonzeroIndices(binaryInputPiece)
-            targetIndxs = [(r, c) for r, c in zip(row, col)]
+            return likelyTargIndxs
+        elif ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
             return targetIndxs
 
         # Note AIS moves opposite to self.threshold; decrease AIS means closer to cell body
@@ -249,10 +259,16 @@ class Processor:
             else:
                 oscFlag += 1
 
-        prevTargetsFound = targetsFound
+        prevTargetsFound = targetsFound ####################### CHANGE ME
+        ##############
+        #################3
+        ##########
 
-        return self.applyReceptiveField(prevTargetsFound, oscFlag)
+        return self.applyReceptiveField(prevTargetsFound, oscFlag, filterIndxs)
 
+
+    def calcWeights(self):
+        pass
 
     def applyThreshold(self):
         '''Threshold image according to ChCs.
@@ -263,7 +279,7 @@ class Processor:
         Returns:
         binaryInputPiece - np binary array of same size as input with value 1
                            wherever input>threshold and 0 elsewhere
-        targetIndxs      - list of row, col indices for found targets
+        targetsFound     - int count of targets found
 
         '''
 
@@ -391,6 +407,7 @@ class Processor:
         for i in range(numSaccades):
             self.pShape.add_Noise()
             newIndxs = self.applyReceptiveField()
+###################3 could return flag from applyRF and if targs from filter and other then update counter more!???
             self.targsINTERNAL.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
 
