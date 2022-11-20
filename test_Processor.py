@@ -73,12 +73,12 @@ class TestProcessor(unittest.TestCase):
         self.processor.pShape = self.pShape
         self.processor.attachedChC = self.attachedChC
         self.processor.threshold = threshold
-        targetIndxs = self.processor.applyReceptiveField()
+        targetIndxs, confidenceFlag = self.processor.applyReceptiveField()
         assert len(targetIndxs) == 10
 
         self.intValArray[0, 0] = 18
         threshold[0, 0] = -1
-        targetIndxs = self.processor.applyReceptiveField()
+        targetIndxs, confidenceFlag = self.processor.applyReceptiveField()
         # print('test_applyReceptiveField', targetIndxs)
         assert len(targetIndxs) == 10
 
@@ -148,7 +148,7 @@ class TestProcessor(unittest.TestCase):
 
     @mock.patch('Processor.Processor.applyReceptiveField')
     def test_internalMove(self, mockedApply):
-        mockedApply.return_value = [(i, i) for i in range(5, 10)]
+        mockedApply.return_value = ([(i, i) for i in range(5, 10)], True)
         self.processor.pShape.input_array = np.ones((10, 10))
         self.processor.threshold = np.ones((10, 10))
         indxs = [(i, i) for i in range(5)]
@@ -162,8 +162,8 @@ class TestProcessor(unittest.TestCase):
 
         for i in range(10):
             for j in range(10):
-                if (i, j) not in mockedApply.return_value:
-                    mockedApply.return_value.append((i, j))
+                if (i, j) not in mockedApply.return_value[0]:
+                    mockedApply.return_value[0].append((i, j))
         # TEST2 force internal move to rely on safety exit of recursion
         self.processor.sparseNum['low'] = 21
         targetIndxs = self.processor.internalMove(indxs)
@@ -180,7 +180,7 @@ class TestProcessor(unittest.TestCase):
         trueTargs = [(r, c) for r, c in zip(row, col)]
         self.processor.trueTargs = set(trueTargs)
 
-        mockedApply.return_value = []
+        mockedApply.return_value = ([], True)
         mockedInternal.side_effect = [
                                        [(i, i) for i in range(5, 10)],
                                        self.processor.trueTargs,

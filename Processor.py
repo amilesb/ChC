@@ -127,7 +127,7 @@ class Processor:
             sparseLow = int(len(self.trueTargs))
         self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
-        targetIndxs = self.applyReceptiveField()
+        targetIndxs, confidenceFlag = self.applyReceptiveField()
 
         print('finished applyRF')
         # targetIndxs, indxCounter = self.internalMove(targetIndxs)
@@ -212,36 +212,115 @@ class Processor:
 
         Returns:
         targetIndxs      - list of row, col indices for found targets
+        confidenceFlag   - boolean based on if targets were found through 2
+                           seperate filtrations or not
         '''
 
         self.countAPPLY_RF += 1
 
         weightsAIS = self.calcWeights()
 
-        binaryInputPiece, targetsFound = self.applyThreshold()
+        # Custom filter; This filter is designed to combat high noise
+        binaryInputPiece, targetsFound = self.applyThreshold(weightsAIS)
         row, col = self.getNonzeroIndices(binaryInputPiece)
         targetIndxs = [(r, c) for r, c in zip(row, col)]
 
+        # Moving average filter; note this filter while effective falls prey to high noise
         if oscFlag%10 == 0:
-            filter = ndimage.uniform_filter(self.pShape.input_array,
-                                            size=oscFlag+3, mode='mirror')
-            normalized = self.pShape.input_array-filter
-            num = np.random.randint(self.sparseNum['low'], self.sparseNum['high'])
-            indxs = np.c_[np.unravel_index(np.argpartition(normalized.ravel(),-num)[-num:],normalized.shape)]
+            rawFilter = ndimage.uniform_filter(self.pShape.input_array,
+                                               size=oscFlag+3, mode='mirror')
+            weightsFilter = ndimage.uniform_filter(weightsAIS, size=oscFlag+3,
+                                                   mode='mirror')
+            weightsFilter = weightsAIS/weightsFilter
+            normWeighted = self.pShape.input_array-(rawFilter*weightsFilter)
+            num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+            indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             filterIndxs = [tuple(x) for x in indxs.tolist()]
 
         likelyTargIndxs = list(set(filterIndxs) & set(targetIndxs))
-        possTargIndxs = list(set(filterIndxs) ^ set(targetIndxs))
+        # possTargIndxs = list(set(filterIndxs) ^ set(targetIndxs))
 
-#  NOTE NEED FILTER INDXS when not provided from if statement i.e. in fxn argument?
-# can remove targetsFound!  but fix test file too
-        # ADD IN LOGIC WITH UNION OF TARGS FOUND!!
+        # Recursive base case return value
+        if self.sparseNum['low'] <= len(likelyTargIndxs) <= self.sparseNum['high']:
+            confidenceFlag = True
+            return likelyTargIndxs, confidenceFlag
+        elif ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
+               or oscFlag==100
+              ):
+            confidenceFlag = False
+            return targetIndxs, confidenceFlag
 
-        if ( (self.sparseNum['low'] <= len(likelyTargIndxs) <= self.sparseNum['high'])
-              or oscFlag == 100 ):
-            return likelyTargIndxs
-        elif ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
-            return targetIndxs
+        # Base case criteria not met; set parameters and initiate recursive search
+        oscFlagUpdated = self.noiseAdjustments(targetsFound, prevTargetsFound,
+                                               binaryInputPiece, oscFlag)
+        prevTargetsFound = targetsFound
+
+        return self.applyReceptiveField(prevTargetsFound, oscFlagUpdated, filterIndxs)
+
+
+    def calcWeights(self):
+        '''Helper function to retrieve ChC weights and adjust according to AIS
+        placement.'''
+
+        RF_AvgToMax = np.mean(self.pShape.input_array)/self.pShape.MAX_INPUT
+
+        numRows = self.pShape.input_array.shape[0]
+        numCols = self.pShape.input_array.shape[1]
+
+        weights = np.zeros([numRows, numCols])
+        for i in range(numRows):
+            for j in range(numCols):
+                weights[i, j] = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
+                                                                     avgPercentFR_RF=RF_AvgToMax)
+                weights[i, j] -= self.AIS.ais[i, j]
+                if weights[i, j] < 0:
+                    weights[i, j] = 0
+
+        return weights
+
+
+    def applyThreshold(self, weightsAIS):
+        '''Threshold image according to ChCs.
+
+        Inputs:
+        weightsAIS       - np array of ChC weights adjusted according to AIS
+                           placement
+
+        Returns:
+        binaryInputPiece - np binary array of same size as input with value 1
+                           wherever input>threshold and 0 elsewhere
+        targetsFound     - int count of targets found
+
+        '''
+
+        chcStep = self.pShape.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+
+        # Check/Set threshold
+        if self.threshold.any() < 0:
+            self.threshold[:] = np.mean(self.pShape.input_array)/chcStep
+
+        result = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
+
+        result = self.pShape.input_array - (chcStep*weightsAIS)
+        binaryInputPiece = np.where(result > self.threshold, 1, 0)
+
+        targetsFound = np.count_nonzero(binaryInputPiece > 0)
+
+        return binaryInputPiece, targetsFound
+
+
+    def noiseAdjustments(self, targetsFound, prevTargetsFound, binaryInputPiece,
+                         oscFlag):
+        '''Helper function to adjust AIS position and/or threshold for targeted
+        input cells depending on the number of targets found.
+
+        Returns:
+
+        oscFlag     - integer value used for updating moving average filter and
+                      terminating base case for recursive function
+                      'applyReceptiveField'
+
+        '''
 
         # Note AIS moves opposite to self.threshold; decrease AIS means closer to cell body
         # i.e. increase ChC which can affect output
@@ -259,55 +338,8 @@ class Processor:
             else:
                 oscFlag += 1
 
-        prevTargetsFound = targetsFound ####################### CHANGE ME
-        ##############
-        #################3
-        ##########
+        return oscFlag
 
-        return self.applyReceptiveField(prevTargetsFound, oscFlag, filterIndxs)
-
-
-    def calcWeights(self):
-        pass
-
-    def applyThreshold(self):
-        '''Threshold image according to ChCs.
-
-        Inputs:
-        input_array      - np array of input
-
-        Returns:
-        binaryInputPiece - np binary array of same size as input with value 1
-                           wherever input>threshold and 0 elsewhere
-        targetsFound     - int count of targets found
-
-        '''
-
-        # Calc basic metrics on input space
-        input_array = self.pShape.input_array
-        arrayMAX = self.pShape.MAX_INPUT
-        avgValInRF = np.mean(input_array)
-        RF_AvgToMax = avgValInRF/arrayMAX
-        chcStep = arrayMAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-
-        # Check/Set threshold
-        if self.threshold.any() < 0:
-            self.threshold[:] = avgValInRF/chcStep
-
-        result = np.zeros([input_array.shape[0], input_array.shape[1]])
-        for i in range(input_array.shape[0]):
-            for j in range(input_array.shape[1]):
-                weight = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
-                                                              avgPercentFR_RF=RF_AvgToMax)
-                weight -= self.AIS.ais[i, j]
-                if weight < 0:
-                    weight = 0
-                result[i, j] = max(input_array[(i,j)] - chcStep*weight, 0)
-        binaryInputPiece = np.where(result > self.threshold, 1, 0)
-
-        targetsFound = np.count_nonzero(binaryInputPiece > 0)
-
-        return binaryInputPiece, targetsFound
 
     def moveAIS(self, binaryInputPiece, direction, max_wt=40):
         '''Helper function to get indices of nonzero elements and adjust AIS
@@ -406,7 +438,7 @@ class Processor:
 
         for i in range(numSaccades):
             self.pShape.add_Noise()
-            newIndxs = self.applyReceptiveField()
+            newIndxs, confidenceFlag = self.applyReceptiveField()
 ###################3 could return flag from applyRF and if targs from filter and other then update counter more!???
             self.targsINTERNAL.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
@@ -434,7 +466,7 @@ class Processor:
             self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
             self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
             self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
-            targetIndxs = self.applyReceptiveField()
+            targetIndxs, confidenceFlag = self.applyReceptiveField()
             unchecked = self.pShape.input_array.size-len(self.targsINTERNAL)
             if unchecked <= self.sparseNum['high']:
                 self.internalNoiseFlag = True
@@ -492,7 +524,7 @@ class Processor:
                 return False, list(correctTargs)
 
             self.simulateExternalMove()
-            newIndxs = self.applyReceptiveField()
+            newIndxs, confidenceFlag = self.applyReceptiveField()
             newIndxs = self.internalMove(newIndxs)
 
             self.countEXTERNAL_MOVE += 1
