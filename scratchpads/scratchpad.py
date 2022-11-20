@@ -19,9 +19,10 @@ class Scratchpad():
         top = np.c_[np.unravel_index(np.argpartition(a.ravel(),-5)[-5:],a.shape)]
 
         print(top)
-        print(type(top))
-        filterIndxs = [i for i in top]
-        print(filterIndxs)
+        print('hellow',type(top))
+        indxs = [tuple(x) for x in top.tolist()]
+        print(indxs)
+        print(type(indxs))
 
 
     def internalMove(self, targetIndxs):

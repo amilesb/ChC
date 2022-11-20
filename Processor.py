@@ -439,8 +439,9 @@ class Processor:
         for i in range(numSaccades):
             self.pShape.add_Noise()
             newIndxs, confidenceFlag = self.applyReceptiveField()
-###################3 could return flag from applyRF and if targs from filter and other then update counter more!???
             self.targsINTERNAL.update(newIndxs)
+            if confidenceFlag: # double the update score
+                self.targsINTERNAL.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
 
         print('after internalmovement', self.targsINTERNAL)
