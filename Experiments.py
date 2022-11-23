@@ -20,24 +20,23 @@ def createFigure1():
 
     standardizedInputs = dict(array_size=32, numTargets=20,
                               useTargetSubclass=True, maxInput=255,
-                              useVariableTargValue=True)
+                              useVariableTargValue=False)
 
 ##################  NEed to find when I miss by just a few!!!!!!!!!! how to find thme???
 
     for i in range(7):
         start = time.time()
         # Simple setup - no noise, blurring, or gradient
-        # P = Processor()
-        # sdrFoundWholeFlag, targetIndxs = P.extractSDR('Exact', sparseHigh=20,
-        #                                               **standardizedInputs
-        #                                               )
+        # pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
+        # P = Processor('Exact', sparseHigh=20, pShape=pShape, attachedChC=attachedChC)
+        # sdrFoundWholeFlag, targetIndxs = P.extractSDR()
         # internal.append(P.countINTERNAL_MOVE)
         # external.append(P.countEXTERNAL_MOVE)
 
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i+8/2,
-                            noiseLevel=i+8/2, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i/2,
+                            noiseLevel=i/2, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))

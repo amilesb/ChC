@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from PIL import Image
 from skimage.draw import polygon_perimeter
@@ -117,13 +118,56 @@ class Polygon:
             print(f'Array too big.  Array size is {array.shape}')
         else:
             if kwargs:
-                print(kwargs)
-                print('Array:')
-                print(array)
-            plt.imshow(np.uint8(array), cmap='gray')
-            plt.show()
+                try:
+                    targsNotFoundYet = kwargs.get('targsNotFoundYet')
+                    correctHits = kwargs.get('correctHits')
+                    misses = kwargs.get('misses')
+                    if targsNotFoundYet:
+                        print('hello')
+                        vis = np.dstack([np.uint8(array), np.uint8(array), np.uint8(array)])
+                        vis = self.setColors(vis, targsNotFoundYet, correctHits, misses)
+                        labels = {1:'targsNotFoundYet', 2:'correctHits', 3:'misses'}
+                        notFoundPatch = mpatches.Patch(color='red', label='targsNotFoundYet')
+                        hitsPatch = mpatches.Patch(color='green', label='correctHits')
+                        missPatch = mpatches.Patch(color='blue', label='misses')
+                        plt.legend(handles=[notFoundPatch, hitsPatch, missPatch])
+                except NameError:
+                    print(kwargs)
+                    print('Array:')
+                    print(array)
+            try:
+                plt.imshow(vis, interpolation='nearest')
+                plt.show()
+            except:
+                plt.imshow(np.uint8(array), cmap='gray')
+                plt.show()
+
             # for debugging:
             # img.save(f'test_{array.shape}_{kwargs["angle"]}_{kwargs["form"]}.png')
+
+
+    def setColors(self, vis, targsNotFoundYet, correctHits, misses):
+        '''Set red to targsNotFoundYet, green to correct hits, and blue for
+        misses in displaying input with indexes.
+
+        Inputs:
+        vis          - np array of 2d grayscale input set along 3 dimensions to
+                       facilitate adding color
+        targsNotFoundYet, correctHits, misses
+                     - lists of indices corresponding to their names
+        '''
+        for indx in targsNotFoundYet:
+            vis[indx[0], indx[1], :] = [255, 0, 0]
+
+        for indx in correctHits:
+            vis[indx[0], indx[1], :] = [0, 255, 0]
+
+        for indx in misses:
+            vis[indx[0], indx[1], :] = [0, 0, 255]
+
+        return vis
+
+
 
     def blur_Array(self, sigma=0.5):
         '''Returns a Guassian blurring function applied across the 2d array.'''

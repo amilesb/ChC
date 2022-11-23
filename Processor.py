@@ -107,12 +107,12 @@ class Processor:
             self.totTargVal += self.pShape.input_array[indx[0], indx[1]]
         self.uncorruptedInput = self.pShape.input_array.copy()
 
-        # self.pShape.display_Polygon(pShape.input_array)
+        self.pShape.display_Polygon(pShape.input_array)
 
         self.gaussBlurSigma = gaussBlurSigma
         self.pShape.blur_Array(sigma=gaussBlurSigma)
 
-        # self.pShape.display_Polygon(pShape.input_array)
+        self.pShape.display_Polygon(pShape.input_array)
 
         self.noiseLevel = noiseLevel
         self.pShape.add_Noise(scale=noiseLevel)
