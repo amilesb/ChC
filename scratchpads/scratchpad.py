@@ -3,6 +3,7 @@ import os.path
 import pickle
 import scipy.stats as stats
 from collections import Counter
+from scipy.ndimage.filters import gaussian_filter
 
 
 class Scratchpad():
@@ -23,6 +24,14 @@ class Scratchpad():
         indxs = [tuple(x) for x in top.tolist()]
         print(indxs)
         print(type(indxs))
+
+
+    def gauss_blur(self):
+        sigma = 0
+        array = np.arange(100, step=1).reshape((10,10))
+        print(array)
+        array = gaussian_filter(array, sigma)
+        print(array)
 
 
     def internalMove(self, targetIndxs):
@@ -50,4 +59,5 @@ if __name__ == '__main__':
 
     scratch = Scratchpad()
     # scratch.internalMove([('aa', 'aa')])
-    scratch.argpart()
+    # scratch.argpart()
+    scratch.gauss_blur()

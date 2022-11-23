@@ -59,8 +59,19 @@ class Processor:
         regenerate an analog output which can then cycle through the process
         hierarchically.''')
 
-    def __init__(self):
-        '''B'''
+    def __init__(self, sparseType, sparseLow=0.02, sparseHigh=0.04,
+                 gaussBlurSigma=0, noiseLevel=0, **kwargs):
+        '''Initialize Processor object with pShape, chandelier cells, sparsity
+        parameters, and noise parameters.
+
+        Inputs:
+        sparseType       - String: either 'Percent' or 'Exact' for target number
+        sparseLow/High   - target sparsity level for extracted SDR
+        gaussBlurSigma   - float standard deviation for blurring input
+        noiseLevel       - float value for random noise added to input
+        **kwargs         - object to be defined as pShape (input_array),
+                           attachedChC, self.seq, self.topo or parameters to
+                           build polygon and attachedChC'''
 
         # self.input_array = input_array
         self.REC_FLD_LENGTH = 4
@@ -73,21 +84,57 @@ class Processor:
         self.suspectFalseTargsInternal = Counter()
         self.correctTargsFound = Counter() # keeps track of targets found at any point in search
         self.falseTargsFound = Counter() # keeps track of false positives at any point in search
-        # stride = np.ceil(pShape.pShape[0]/REC_FLD_LENGTH) # 256/4 = 32
-        # num_receptive_fields = stride**2 # 1024
         self.sparseNum = {}
-        self.pShape = Polygon(array_size=10, x=3, y=3)
-        self.pShape.insert_Polygon()
 
-    def extractSDR(self, sparseType, sparseLow=0.02, sparseHigh=0.04, **kwargs):
-        ''' Top level function to take an input and run through the network.
+        if kwargs:
+            try:
+                pShape = kwargs.get('pShape')
+                attachedChC = kwargs.get('attachedChC')
+            except NameError:
+                pShape, attachedChC = self.buildPolygonAndAttachChC(**kwargs)
 
-        Inputs:
-        sparseType       - String: either 'Percent' or 'Exact' for target number
-        sparseLow/High   - target sparsity level for extracted SDR
-        *kwargs          - object to be defined as pShape (input_array),
-                           attachedChC, self.seq, self.topo or parameters to
-                           build polygon and attachedChC
+        # Set instance variables
+        self.pShape = pShape
+        self.attachedChC = attachedChC
+
+        self.threshold = np.zeros((pShape.input_array.shape[0],
+                                   pShape.input_array.shape[1]))
+        self.threshold[:] = -1
+
+        self.trueTargs = set(pShape.activeElements)
+        self.totTargVal = 0
+        for indx in pShape.activeElements:
+            self.totTargVal += self.pShape.input_array[indx[0], indx[1]]
+        self.uncorruptedInput = self.pShape.input_array.copy()
+
+        # self.pShape.display_Polygon(pShape.input_array)
+
+        self.gaussBlurSigma = gaussBlurSigma
+        self.pShape.blur_Array(sigma=gaussBlurSigma)
+
+        # self.pShape.display_Polygon(pShape.input_array)
+
+        self.noiseLevel = noiseLevel
+        self.pShape.add_Noise(scale=noiseLevel)
+
+        # self.pShape.display_Polygon(pShape.input_array)
+
+        if sparseType=='Percent':
+            sparseLow = int(np.round(pShape.size*sparseLow))
+            sparseHigh = int(np.round(pShape.size*sparseHigh))
+        elif sparseType == 'Exact':
+            sparseLow = int(sparseHigh)
+        if sparseLow > len(self.trueTargs):
+            sparseLow = int(len(self.trueTargs))
+        self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
+
+        # build ais
+        self.AIS = AIS(pShape, attachedChC)
+
+
+    def extractSDR(self):
+        ''' Top level function to control process flow and extract an SDR from
+        an input.
 
         Returns:
         SDR              - extracted SDR
@@ -97,35 +144,6 @@ class Processor:
                            incomplete i.e. less than sparse lower bound
                            indicating ambiguity.
         '''
-
-        if kwargs:
-            try:
-                pShape = kwargs.get('pShape')
-                attachedChC = kwargs.get('attachedChC')
-            except NameError:
-                pShape, attachedChC = self.buildPolygonAndAttachChC(**kwargs)
-
-        self.pShape = pShape
-        self.attachedChC = attachedChC
-        self.trueTargs = set(pShape.activeElements)
-
-        # build ais
-        self.AIS = AIS(pShape, attachedChC)
-
-        fldHEIGHT = self.pShape.input_array.shape[0]
-        fldWIDTH = self.pShape.input_array.shape[1]
-        intValArray = np.zeros((fldHEIGHT, fldWIDTH))
-        self.threshold = np.zeros((fldHEIGHT, fldWIDTH))
-        self.threshold[:] = -1
-
-        if sparseType=='Percent':
-            sparseLow = int(np.round(self.pShape.size*sparseLow))
-            sparseHigh = int(np.round(self.pShape.size*sparseHigh))
-        elif sparseType == 'Exact':
-            sparseLow = int(sparseHigh)
-        if sparseLow > len(self.trueTargs):
-            sparseLow = int(len(self.trueTargs))
-        self.sparseNum = {'low': sparseLow, 'high': sparseHigh}
 
         targetIndxs, confidenceFlag = self.applyReceptiveField()
 
@@ -153,8 +171,8 @@ class Processor:
 
         return sdrFoundWholeFlag, targetIndxs
 
-
-    def buildPolygonAndAttachChC(self, array_size=10, form='rectangle', x=4,
+    @staticmethod
+    def buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4,
                                  y=4, wd=4, ht=3, angle=0,
                                  useTargetSubclass=False, numTargets=False,
                                  numClusters=0, maxInput=255,
@@ -231,6 +249,7 @@ class Processor:
                                                size=oscFlag+3, mode='mirror')
             weightsFilter = ndimage.uniform_filter(weightsAIS, size=oscFlag+3,
                                                    mode='mirror')
+            weightsFilter[weightsFilter==0] = 1
             weightsFilter = weightsAIS/weightsFilter
             normWeighted = self.pShape.input_array-(rawFilter*weightsFilter)
             num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
@@ -432,11 +451,10 @@ class Processor:
         originalInput = self.pShape.input_array.copy()
 
         print('internal move', self.countINTERNAL_MOVE)
-        print('before update targsInternal', self.targsINTERNAL)
         self.targsINTERNAL.update(targetIndxs)
-        print('after update', self.targsINTERNAL)
 
         for i in range(numSaccades):
+            # self.pShape.blur_Array(sigma=self.gaussBlurSigma)
             self.pShape.add_Noise()
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
@@ -444,7 +462,8 @@ class Processor:
                 self.targsINTERNAL.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
 
-        print('after internalmovement', self.targsINTERNAL)
+        print('targsFoundRight', sorted(set(self.targsINTERNAL) & set(self.pShape.activeElements)))
+        print('Wrong suspects', sorted(set(self.targsINTERNAL) - set(self.pShape.activeElements)))
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
@@ -456,7 +475,7 @@ class Processor:
 
         if self.countINTERNAL_MOVE > 1:
             print('length targs internal', len(self.targsINTERNAL))
-            print('current target indexes', targetIndxs)
+            print('current target indexes', sorted(targetIndxs))
 
         targetsFound = len(targetIndxs)
 
@@ -509,7 +528,7 @@ class Processor:
         '''
 
         originalInput = self.pShape.input_array.copy()
-        print('targetindxs external move', targetIndxs)
+        print('targetindxs external move', sorted(targetIndxs))
 
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
@@ -524,7 +543,8 @@ class Processor:
             if len(self.correctTargsFound) >= self.sparseNum['low']:
                 return False, list(correctTargs)
 
-            self.simulateExternalMove()
+            self.simulateExternalMove(noise=0)
+            self.pShape.display_Polygon(self.pShape.input_array)
             newIndxs, confidenceFlag = self.applyReceptiveField()
             newIndxs = self.internalMove(newIndxs)
 
@@ -535,28 +555,43 @@ class Processor:
             return self.externalMove(newIndxs)
 
 
-    def simulateExternalMove(self):
-        '''Helper function to adjust contrast across input space.'''
+    def simulateExternalMove(self, noise):
+        '''Helper function to randomly readjust target contrast.'''
 
-        randFirst = np.random.randint(0, self.pShape.MAX_INPUT)
-        randSecond = np.random.randint(0, self.pShape.MAX_INPUT-randFirst)
-        rowStart = np.random.randint(0, self.pShape.input_array.shape[1])
-        colStart = np.random.randint(0, self.pShape.input_array.shape[0])
+        redistribute = self.totTargVal + 8#J######### compute noise metric!!!!
+        shuffledTargs = np.random.shuffle(list(self.trueTargs))
+        for i, idx in enumerate(shuffledTargs):
+            if i == len(shuffledTargs-1):
+                self.pShape.input_array[idx[0], idx[1]] = redistribute
+            else:
+                val = np.random.uniform(0, redistribute)
+                self.pShape.input_array[idx[0], idx[1]] = val
+                redistribute -= val
 
-        if np.random.randint(0, 2) == 0:
-            self.pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
-                                        rowStart=rowStart)
-            self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-                                        colStart=colStart)
-        else:
-            self.pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
-                                        colStart=colStart)
-            self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-                                        rowStart=rowStart)
+
+
+
+
+        # randFirst = np.random.randint(0, self.pShape.MAX_INPUT)
+        # randSecond = np.random.randint(0, self.pShape.MAX_INPUT-randFirst)
+        # rowStart = np.random.randint(0, self.pShape.input_array.shape[1])
+        # colStart = np.random.randint(0, self.pShape.input_array.shape[0])
+        #
+        # if np.random.randint(0, 2) == 0:
+        #     self.pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
+        #                                 rowStart=rowStart)
+        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+        #                                 colStart=colStart)
+        # else:
+        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
+        #                                 colStart=colStart)
+        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
+        #                                 rowStart=rowStart)
 
         return
 
-
+# np.mean(self.pShape.input_array)
+# self.trueTargs
 
     def calcInterference(self, result, threshold):
         '''Examine values within receptive field and calculate interference to

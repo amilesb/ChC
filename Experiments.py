@@ -19,10 +19,10 @@ def createFigure1():
     externalN = []
 
     standardizedInputs = dict(array_size=32, numTargets=20,
-                              useTargetSubclass=True, maxInput=63,
+                              useTargetSubclass=True, maxInput=255,
                               useVariableTargValue=True)
 
-
+##################  NEed to find when I miss by just a few!!!!!!!!!! how to find thme???
 
     for i in range(7):
         start = time.time()
@@ -35,18 +35,13 @@ def createFigure1():
         # external.append(P.countEXTERNAL_MOVE)
 
         # Setup - with noise and blurring but no gradient
-        P_Noise = Processor()
-        pShape, attachedChC = P_Noise.buildPolygonAndAttachChC(**standardizedInputs)
-        pShape.display_Polygon(pShape.input_array)
-        pShape.blur_Array(sigma=2)
-        pShape.display_Polygon(pShape.input_array)
-        pShape.add_Noise(scale=i+1)
-        pShape.display_Polygon(pShape.input_array)
-        sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR('Exact',
-                                                            sparseHigh=20,
-                                                            pShape=pShape,
-                                                            attachedChC=attachedChC
-                                                           )
+        pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i+8/2,
+                            noiseLevel=i+8/2, pShape=pShape,
+                            attachedChC=attachedChC
+                            )
+        print('True Targets', sorted(pShape.activeElements))
+        sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR()
         applyRF_N.append(P_Noise.countAPPLY_RF)
         internalN.append(P_Noise.countINTERNAL_MOVE)
         externalN.append(P_Noise.countEXTERNAL_MOVE)
