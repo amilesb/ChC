@@ -112,7 +112,7 @@ class Polygon:
 
         return self.input_array
 
-    def display_Polygon(self, array, **kwargs): #angle, shape, polygon):
+    def display_Polygon(self, array, plotTitle, **kwargs): #angle, shape, polygon):
         '''For troubleshooting and guiding visual intuition.'''
         if array.size > 1025:
             print(f'Array too big.  Array size is {array.shape}')
@@ -123,7 +123,6 @@ class Polygon:
                     correctHits = kwargs.get('correctHits')
                     misses = kwargs.get('misses')
                     if targsNotFoundYet:
-                        print('hello')
                         vis = np.dstack([np.uint8(array), np.uint8(array), np.uint8(array)])
                         vis = self.setColors(vis, targsNotFoundYet, correctHits, misses)
                         labels = {1:'targsNotFoundYet', 2:'correctHits', 3:'misses'}
@@ -135,6 +134,7 @@ class Polygon:
                     print(kwargs)
                     print('Array:')
                     print(array)
+            plt.title(plotTitle)
             try:
                 plt.imshow(vis, interpolation='nearest')
                 plt.show()

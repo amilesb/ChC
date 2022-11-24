@@ -60,7 +60,7 @@ class Processor:
         hierarchically.''')
 
     def __init__(self, sparseType, sparseLow=0.02, sparseHigh=0.04,
-                 gaussBlurSigma=0, noiseLevel=0, **kwargs):
+                 gaussBlurSigma=0, noiseLevel=0, display=False, **kwargs):
         '''Initialize Processor object with pShape, chandelier cells, sparsity
         parameters, and noise parameters.
 
@@ -106,18 +106,21 @@ class Processor:
         for indx in pShape.activeElements:
             self.totTargVal += self.pShape.input_array[indx[0], indx[1]]
         self.uncorruptedInput = self.pShape.input_array.copy()
-
-        self.pShape.display_Polygon(pShape.input_array)
+        if display:
+            plotTitle = 'Raw Target Input'
+            self.pShape.display_Polygon(pShape.input_array, plotTitle)
 
         self.gaussBlurSigma = gaussBlurSigma
         self.pShape.blur_Array(sigma=gaussBlurSigma)
-
-        self.pShape.display_Polygon(pShape.input_array)
+        if display:
+            plotTitle = 'Input After Gaussian Blurring'
+            self.pShape.display_Polygon(pShape.input_array, plotTitle)
 
         self.noiseLevel = noiseLevel
         self.pShape.add_Noise(scale=noiseLevel)
-
-        # self.pShape.display_Polygon(pShape.input_array)
+        if display:
+            plotTitle='Input With Noise Added'
+            self.pShape.display_Polygon(pShape.input_array, plotTitle)
 
         if sparseType=='Percent':
             sparseLow = int(np.round(pShape.size*sparseLow))

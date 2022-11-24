@@ -67,43 +67,45 @@ class TestPoly(unittest.TestCase):
         targsNotFoundYet = [(1, 2), (1, 3)]
         correctHits = [(2, 2), (3, 2)]
         misses = [(4, 4), (5, 5)]
-        self.rect.display_Polygon(self.rect.input_array,
+        self.rect.display_Polygon(self.rect.input_array, plotTitle='Rectangle',
                                   targsNotFoundYet=targsNotFoundYet,
                                   correctHits=correctHits,
                                   misses=misses)
 
-    #
-    # def test_create_Gradient(self):
-    #     self.grad = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
-    #                                         y = 5, width=8, height=6, angle = 0)
-    #     self.grad.insert_Polygon()
-    #
-    #     self.grad.create_Gradient(is_horizontal=True, gradStart=0, gradStop=127,
-    #                               rowStart=5)
-    #     self.grad.create_Gradient(is_horizontal=False, gradStart=0, gradStop=127,
-    #                               colStart=8)
-    #     print(f'''Testing an embedded rectangle with a gradient applied along
-    #             both axes''')
-    #     self.grad.display_Polygon(self.grad.input_array)
-    #
-    #     # self.grad.display_Polygon(self.grad.input_array, angle =self.grad.angle,
-    #                                 # form=self.grad.form)
-    #
-    # def test_blur_Array(self):
-    #     self.blurred = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
-    #                                     y = 5, width=8, height=6, angle = 0)
-    #     self.blurred.insert_Polygon()
-    #     self.blurred.blur_Array(0.8)
-    #     self.blurred.display_Polygon(self.blurred.input_array, angle=self.blurred.angle)
-    #
-    #
-    #
-    # def test_add_Noise(self):
-    #     self.noisy = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
-    #                                     y = 5, width=8, height=6, angle = 0)
-    #     self.noisy.insert_Polygon()
-    #     self.noisy.add_Noise(40)
-    #     self.noisy.display_Polygon(self.noisy.input_array, angle=self.noisy.angle)
+
+    def test_create_Gradient(self):
+        self.grad = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
+                                            y = 5, width=8, height=6, angle = 0)
+        self.grad.insert_Polygon()
+
+        self.grad.create_Gradient(is_horizontal=True, gradStart=0, gradStop=127,
+                                  rowStart=5)
+        self.grad.create_Gradient(is_horizontal=False, gradStart=0, gradStop=127,
+                                  colStart=8)
+        print(f'''Testing an embedded rectangle with a gradient applied along
+                both axes''')
+        self.grad.display_Polygon(self.grad.input_array, plotTitle='Gradient')
+
+        # self.grad.display_Polygon(self.grad.input_array, angle=self.grad.angle,
+                                    # plotTitle='Gradient With Angle', form=self.grad.form)
+
+    def test_blur_Array(self):
+        self.blurred = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
+                                        y = 5, width=8, height=6, angle = 0)
+        self.blurred.insert_Polygon()
+        self.blurred.blur_Array(0.8)
+        self.blurred.display_Polygon(self.blurred.input_array, plotTitle='Blur',
+                                     angle=self.blurred.angle)
+
+
+
+    def test_add_Noise(self):
+        self.noisy = Polygon.Polygon(array_size=12, form='rectangle', x = 5,
+                                        y = 5, width=8, height=6, angle = 0)
+        self.noisy.insert_Polygon()
+        self.noisy.add_Noise(40)
+        self.noisy.display_Polygon(self.noisy.input_array, plotTitle='Noise',
+                                   angle=self.noisy.angle)
 
 class TestTarget(unittest.TestCase):
 
@@ -112,7 +114,7 @@ class TestTarget(unittest.TestCase):
 
     # def test_insert_Targets(self):
     #     self.targ.insert_Targets()
-    #     self.targ.display_Polygon(self.targ.input_array)
+    #     self.targ.display_Polygon(self.targ.input_array, plotTitle='Random SDR')
     #
     #     assert self.targ.numActiveElements == self.targ.numTargets
 
