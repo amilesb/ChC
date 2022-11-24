@@ -114,6 +114,7 @@ class Polygon:
 
     def display_Polygon(self, array, plotTitle, **kwargs): #angle, shape, polygon):
         '''For troubleshooting and guiding visual intuition.'''
+        fig = plt.figure()
         if array.size > 1025:
             print(f'Array too big.  Array size is {array.shape}')
         else:
@@ -129,12 +130,15 @@ class Polygon:
                         notFoundPatch = mpatches.Patch(color='red', label='targsNotFoundYet')
                         hitsPatch = mpatches.Patch(color='green', label='correctHits')
                         missPatch = mpatches.Patch(color='blue', label='misses')
-                        plt.legend(handles=[notFoundPatch, hitsPatch, missPatch])
+                        plt.legend(handles=[notFoundPatch, hitsPatch, missPatch],
+                                   bbox_to_anchor=(0.85, -0.01), loc="lower right",
+                                   bbox_transform=fig.transFigure, ncol=3)
                 except NameError:
                     print(kwargs)
                     print('Array:')
                     print(array)
             plt.title(plotTitle)
+
             try:
                 plt.imshow(vis, interpolation='nearest')
                 plt.show()
