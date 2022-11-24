@@ -1,6 +1,7 @@
 import numpy as np
 import os.path
 import pickle
+import matplotlib.pyplot as plt
 import scipy.stats as stats
 from collections import Counter
 from scipy.ndimage.filters import gaussian_filter
@@ -33,6 +34,14 @@ class Scratchpad():
         array = gaussian_filter(array, sigma)
         print(array)
 
+        sigma=2.5
+        mu=3
+        s=np.random.normal(mu, sigma, size=(2, 4))
+        count, bins, ignored = plt.hist(s, 30, density=True)
+        plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
+        np.exp( - (bins - mu)**2 / (2 * sigma**2) ), linewidth=2, color='r')
+        plt.show()
+
 
     def internalMove(self, targetIndxs):
 
@@ -60,4 +69,4 @@ if __name__ == '__main__':
     scratch = Scratchpad()
     # scratch.internalMove([('aa', 'aa')])
     # scratch.argpart()
-    scratch.gauss_blur()
+    # scratch.gauss_blur()

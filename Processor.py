@@ -2,6 +2,7 @@
 form a regenerative hierarchically designed cycle.'''
 
 import numpy as np
+import random
 import os.path
 import pickle
 from scipy import stats, ndimage
@@ -150,7 +151,7 @@ class Processor:
 
         targetIndxs, confidenceFlag = self.applyReceptiveField()
 
-        print('finished applyRF')
+        print('finished applyRF', sorted(targetIndxs))
         # targetIndxs, indxCounter = self.internalMove(targetIndxs)
         targetIndxs = self.internalMove(targetIndxs)
         print('finished internalMove')
@@ -457,16 +458,15 @@ class Processor:
         self.targsINTERNAL.update(targetIndxs)
 
         for i in range(numSaccades):
-            # self.pShape.blur_Array(sigma=self.gaussBlurSigma)
-            self.pShape.add_Noise()
+            self.pShape.input_array = self.uncorruptedInput
+            self.pShape.blur_Array(sigma=self.gaussBlurSigma)
+            self.pShape.add_Noise(scale=self.noiseLevel)
+            # self.pShape.add_Noise()
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
             if confidenceFlag: # double the update score
                 self.targsINTERNAL.update(newIndxs)
             self.pShape.input_array = originalInput.copy() # restore input
-
-        print('targsFoundRight', sorted(set(self.targsINTERNAL) & set(self.pShape.activeElements)))
-        print('Wrong suspects', sorted(set(self.targsINTERNAL) - set(self.pShape.activeElements)))
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
@@ -475,6 +475,11 @@ class Processor:
                 suspectedFalseTargsDueToNoise.append(targ)
             else:
                 targetIndxs.append(targ)
+
+        print('targsFoundRight', sorted(set(self.targsINTERNAL) & set(self.pShape.activeElements)))
+        print('current targs selected', sorted(targetIndxs))
+        print('Wrong suspects', sorted(set(self.targsINTERNAL) - set(self.pShape.activeElements)))
+
 
         if self.countINTERNAL_MOVE > 1:
             print('length targs internal', len(self.targsINTERNAL))
@@ -507,7 +512,7 @@ class Processor:
         '''Helper function to remove suspected false targets from consideration.'''
 
         for falseTarg in suspectedFalseTargsDueToNoise:
-            self.AIS.ais[falseTarg] = 0 # place ais at cell body
+            self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais towards cell body
             self.threshold[falseTarg] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
 
 
@@ -546,8 +551,8 @@ class Processor:
             if len(self.correctTargsFound) >= self.sparseNum['low']:
                 return False, list(correctTargs)
 
-            self.simulateExternalMove(noise=0)
-            self.pShape.display_Polygon(self.pShape.input_array)
+            self.simulateExternalMove()
+            # self.pShape.display_Polygon(self.pShape.input_array, plotTitle='after external move')
             newIndxs, confidenceFlag = self.applyReceptiveField()
             newIndxs = self.internalMove(newIndxs)
 
@@ -558,17 +563,20 @@ class Processor:
             return self.externalMove(newIndxs)
 
 
-    def simulateExternalMove(self, noise):
+    def simulateExternalMove(self, noiseLevel=5):
         '''Helper function to randomly readjust target contrast.'''
 
-        redistribute = self.totTargVal + 8#J######### compute noise metric!!!!
-        shuffledTargs = np.random.shuffle(list(self.trueTargs))
-        for i, idx in enumerate(shuffledTargs):
-            if i == len(shuffledTargs-1):
-                self.pShape.input_array[idx[0], idx[1]] = redistribute
+        noise = np.random.normal(0, noiseLevel)
+        redistribute = self.totTargVal + noise
+        trueTargsList = list(self.trueTargs)
+        np.random.shuffle(trueTargsList)
+        for i, idx in enumerate(trueTargsList):
+            targsLeft = len(trueTargsList)-i
+            if targsLeft==1:
+                self.pShape.input_array[idx[0], idx[1]] = np.maximum(redistribute, 0)
             else:
-                val = np.random.uniform(0, redistribute)
-                self.pShape.input_array[idx[0], idx[1]] = val
+                val = np.round(np.random.normal(redistribute//targsLeft, noiseLevel))
+                self.pShape.input_array[idx[0], idx[1]] = np.maximum(val, 0)
                 redistribute -= val
 
 
