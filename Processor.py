@@ -86,6 +86,7 @@ class Processor:
         self.correctTargsFound = Counter() # keeps track of targets found at any point in search
         self.falseTargsFound = Counter() # keeps track of false positives at any point in search
         self.sparseNum = {}
+        self.internalMovesCounter=[]
 
         if kwargs:
             try:
@@ -136,45 +137,6 @@ class Processor:
         self.AIS = AIS(pShape, attachedChC)
 
 
-    def extractSDR(self):
-        ''' Top level function to control process flow and extract an SDR from
-        an input.
-
-        Returns:
-        SDR              - extracted SDR
-        sdrFoundWholeFlag- Boolean indicating that if true then indexes
-                           corresponding to SDR match the lower bound of ground
-                           truth indices.  If false, targetIndxs will be
-                           incomplete i.e. less than sparse lower bound
-                           indicating ambiguity.
-        '''
-
-        targetIndxs, confidenceFlag = self.applyReceptiveField()
-
-        print('finished applyRF', sorted(targetIndxs))
-        # targetIndxs, indxCounter = self.internalMove(targetIndxs)
-        targetIndxs = self.internalMove(targetIndxs)
-        print('finished internalMove')
-        if self.internalNoiseFlag:
-            pass
-            ###### Need to implement REWIRING!!
-
-        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
-
-        # firingRateOutput = self.calcInterference(result, self.threshold)
-
-        # if not self.seq:
-        #     self.seq = Sequencer(self.sp)
-
-        # if objectToTrain == 'seq':
-        #     self.seq.evalActiveColsVersusPreds(winningColumnsInd)
-        #
-        # if objectToTrain == 'topo':
-        #     self.trainTopo()
-
-
-        return sdrFoundWholeFlag, targetIndxs
-
     @staticmethod
     def buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4,
                                  y=4, wd=4, ht=3, angle=0,
@@ -221,6 +183,46 @@ class Processor:
                 pickle.dump(attachedChC, ChC_handle)
 
         return pShape, attachedChC
+
+
+    def extractSDR(self):
+        ''' Top level function to control process flow and extract an SDR from
+        an input.
+
+        Returns:
+        SDR              - extracted SDR
+        sdrFoundWholeFlag- Boolean indicating that if true then indexes
+                           corresponding to SDR match the lower bound of ground
+                           truth indices.  If false, targetIndxs will be
+                           incomplete i.e. less than sparse lower bound
+                           indicating ambiguity.
+        '''
+
+        targetIndxs, confidenceFlag = self.applyReceptiveField()
+
+        print('finished applyRF', sorted(targetIndxs))
+        # targetIndxs, indxCounter = self.internalMove(targetIndxs)
+        targetIndxs = self.internalMove(targetIndxs)
+        print('finished internalMove')
+        if self.internalNoiseFlag:
+            pass
+            ###### Need to implement REWIRING!!
+
+        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+
+        # firingRateOutput = self.calcInterference(result, self.threshold)
+
+        # if not self.seq:
+        #     self.seq = Sequencer(self.sp)
+
+        # if objectToTrain == 'seq':
+        #     self.seq.evalActiveColsVersusPreds(winningColumnsInd)
+        #
+        # if objectToTrain == 'topo':
+        #     self.trainTopo()
+
+
+        return sdrFoundWholeFlag, targetIndxs
 
 
     def applyReceptiveField(self, prevTargetsFound=0, oscFlag=0,
@@ -458,10 +460,9 @@ class Processor:
         self.targsINTERNAL.update(targetIndxs)
 
         for i in range(numSaccades):
-            self.pShape.input_array = self.uncorruptedInput
+            self.pShape.input_array = self.uncorruptedInput.copy()
             self.pShape.blur_Array(sigma=self.gaussBlurSigma)
             self.pShape.add_Noise(scale=self.noiseLevel)
-            # self.pShape.add_Noise()
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
             if confidenceFlag: # double the update score
@@ -476,15 +477,6 @@ class Processor:
             else:
                 targetIndxs.append(targ)
 
-        print('targsFoundRight', sorted(set(self.targsINTERNAL) & set(self.pShape.activeElements)))
-        print('current targs selected', sorted(targetIndxs))
-        print('Wrong suspects', sorted(set(self.targsINTERNAL) - set(self.pShape.activeElements)))
-
-
-        if self.countINTERNAL_MOVE > 1:
-            print('length targs internal', len(self.targsINTERNAL))
-            print('current target indexes', sorted(targetIndxs))
-
         targetsFound = len(targetIndxs)
 
         if (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high']):
@@ -495,7 +487,8 @@ class Processor:
             self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
             self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
             targetIndxs, confidenceFlag = self.applyReceptiveField()
-            unchecked = self.pShape.input_array.size-len(self.targsINTERNAL)
+            penaltySearch = len(self.targsINTERNAL) * self.countINTERNAL_MOVE * (2*self.sparseNum['low']-self.sparseNum['high'])
+            unchecked = self.pShape.input_array.size-abs(penaltySearch)
             if unchecked <= self.sparseNum['high']:
                 self.internalNoiseFlag = True
                 bestGuess = self.targsINTERNAL.most_common(self.sparseNum['low'])
@@ -504,7 +497,6 @@ class Processor:
                     targetIndxs.append(indxAndCount[0])
                 return targetIndxs
             else:
-                print('hey look i run')
                 return self.internalMove(targetIndxs, clearTargIndxCounter=False)
 
 
@@ -538,6 +530,16 @@ class Processor:
         originalInput = self.pShape.input_array.copy()
         print('targetindxs external move', sorted(targetIndxs))
 
+        # For debugging and visulization
+        targsNotFoundYet = list(set(self.pShape.activeElements) - set(targetIndxs))
+        correctHits = list(set(self.pShape.activeElements) & set(targetIndxs))
+        misses = list(set(self.targsINTERNAL) - set(self.pShape.activeElements))
+        plotTitle=f'From Internal Movement Target Indexes'
+        self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
+                                        targsNotFoundYet=targsNotFoundYet,
+                                        correctHits=correctHits, misses=misses
+                                       )
+
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
             correctTargs = suspectedTargs & self.trueTargs
@@ -546,14 +548,27 @@ class Processor:
             self.correctTargsFound.update(correctTargs)
             self.falseTargsFound.update(incorrect)
 
+
+            # For debugging and visulization
+            targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
+            correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
+            misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
+            plotTitle=f'External Movement Target Indexes'
+            self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
+                                            targsNotFoundYet=targsNotFoundYet,
+                                            correctHits=correctHits, misses=misses
+                                           )
+
             if len(correctTargs) >= self.sparseNum['low']:
                 return True, list(correctTargs)
             if len(self.correctTargsFound) >= self.sparseNum['low']:
                 return False, list(correctTargs)
 
-            self.simulateExternalMove()
+            self.simulateExternalMove(self.noiseLevel)
             # self.pShape.display_Polygon(self.pShape.input_array, plotTitle='after external move')
             newIndxs, confidenceFlag = self.applyReceptiveField()
+            self.internalMovesCounter.append(self.countINTERNAL_MOVE)
+            self.countINTERNAL_MOVE = 0
             newIndxs = self.internalMove(newIndxs)
 
             self.countEXTERNAL_MOVE += 1
@@ -563,9 +578,13 @@ class Processor:
             return self.externalMove(newIndxs)
 
 
-    def simulateExternalMove(self, noiseLevel=5):
+    def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):
         '''Helper function to randomly readjust target contrast.'''
 
+        # Reset input array
+        self.pShape.input_array = self.uncorruptedInput.copy()
+
+        # Redistribute true target values stochastically
         noise = np.random.normal(0, noiseLevel)
         redistribute = self.totTargVal + noise
         trueTargsList = list(self.trueTargs)
@@ -579,7 +598,17 @@ class Processor:
                 self.pShape.input_array[idx[0], idx[1]] = np.maximum(val, 0)
                 redistribute -= val
 
-
+        # Reconstruct blurring and noise - default is same levels as initial
+        # input but can be adjusted to simulate changes to better or worse
+        # external environment noise.
+        # (i.e. adjustment away from default represents crude knobs to tune
+        # for lateral connectivity between columns)
+        if blur:
+            self.pShape.blur_Array(sigma=self.gaussBlurSigma)
+        else:
+            self.pShape.blur_Array(sigma=self.gaussBlurSigma)
+        if arrayNoise:
+            self.pShape.add_Noise(scale=self.noiseLevel)
 
 
 
