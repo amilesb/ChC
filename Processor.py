@@ -198,6 +198,10 @@ class Processor:
                            indicating ambiguity.
         '''
 
+        self.initalAISWeights = self.AIS.ais.copy()
+        ChCWeightsOnly = self.calcWeights()
+        self.initialChCWeights = ChCWeightsOnly.copy()
+
         targetIndxs, confidenceFlag = self.applyReceptiveField()
 
         print('finished applyRF', sorted(targetIndxs))
@@ -209,6 +213,15 @@ class Processor:
             ###### Need to implement REWIRING!!
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+
+        targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
+        correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
+        misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
+        plotTitle=f'External Movement Target Indexes'
+        self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
+                                        targsNotFoundYet=targsNotFoundYet,
+                                        correctHits=correctHits, misses=misses
+                                       )
 
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
@@ -283,7 +296,7 @@ class Processor:
         return self.applyReceptiveField(prevTargetsFound, oscFlagUpdated, filterIndxs)
 
 
-    def calcWeights(self):
+    def calcWeights(self, adjustWeightsAIS=True):
         '''Helper function to retrieve ChC weights and adjust according to AIS
         placement.'''
 
@@ -297,9 +310,10 @@ class Processor:
             for j in range(numCols):
                 weights[i, j] = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
                                                                      avgPercentFR_RF=RF_AvgToMax)
-                weights[i, j] -= self.AIS.ais[i, j]
-                if weights[i, j] < 0:
-                    weights[i, j] = 0
+                if adjustWeightsAIS:
+                    weights[i, j] -= self.AIS.ais[i, j]
+                    if weights[i, j] < 0:
+                        weights[i, j] = 0
 
         return weights
 
@@ -463,6 +477,7 @@ class Processor:
             self.pShape.input_array = self.uncorruptedInput.copy()
             self.pShape.blur_Array(sigma=self.gaussBlurSigma)
             self.pShape.add_Noise(scale=self.noiseLevel)
+
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
             if confidenceFlag: # double the update score
@@ -540,24 +555,26 @@ class Processor:
                                         correctHits=correctHits, misses=misses
                                        )
 
+        # THIS ISN't PLOTTING CORRECTLY!!!!!! i.e. not updating bc inside recursion!!!
+        # # For debugging and visulization
+        # targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
+        # correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
+        # misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
+        # plotTitle=f'External Movement Target Indexes'
+        # self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
+        #                                 targsNotFoundYet=targsNotFoundYet,
+        #                                 correctHits=correctHits, misses=misses
+        #                                )
+
+
         while True:
+
             suspectedTargs = set(targ for targ in targetIndxs)
             correctTargs = suspectedTargs & self.trueTargs
             incorrect = suspectedTargs - self.trueTargs
 
             self.correctTargsFound.update(correctTargs)
             self.falseTargsFound.update(incorrect)
-
-
-            # For debugging and visulization
-            targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
-            correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
-            misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
-            plotTitle=f'External Movement Target Indexes'
-            self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
-                                            targsNotFoundYet=targsNotFoundYet,
-                                            correctHits=correctHits, misses=misses
-                                           )
 
             if len(correctTargs) >= self.sparseNum['low']:
                 return True, list(correctTargs)
@@ -566,6 +583,19 @@ class Processor:
 
             self.simulateExternalMove(self.noiseLevel)
             # self.pShape.display_Polygon(self.pShape.input_array, plotTitle='after external move')
+
+            # set chandelier cell weights / reset AIS weights to help search input space
+            self.AIS.ais = self.initalAISWeights.copy()
+            totalValOfTargsFound = 0
+            for i in targetIndxs:
+                totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
+            searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
+            P = np.exp(-self.countEXTERNAL_MOVE/searchFactor)
+            if P > np.random.default_rng().random():
+                # search close to targs found i.e. decrease chc weights near targ
+            else:
+                # search far away targets found i.e. decrease chc weights farther away
+
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0
@@ -611,22 +641,6 @@ class Processor:
             self.pShape.add_Noise(scale=self.noiseLevel)
 
 
-
-        # randFirst = np.random.randint(0, self.pShape.MAX_INPUT)
-        # randSecond = np.random.randint(0, self.pShape.MAX_INPUT-randFirst)
-        # rowStart = np.random.randint(0, self.pShape.input_array.shape[1])
-        # colStart = np.random.randint(0, self.pShape.input_array.shape[0])
-        #
-        # if np.random.randint(0, 2) == 0:
-        #     self.pShape.create_Gradient(is_horizontal=True, gradStop=randFirst,
-        #                                 rowStart=rowStart)
-        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-        #                                 colStart=colStart)
-        # else:
-        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randFirst,
-        #                                 colStart=colStart)
-        #     self.pShape.create_Gradient(is_horizontal=False, gradStop=randSecond,
-        #                                 rowStart=rowStart)
 
         return
 
