@@ -214,6 +214,10 @@ class Processor:
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
 
+        if sdrFoundWholeFlag:
+            # Reward chandelier cell weights for those target indices and save these as abstract SDR X.
+            pass
+
         targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
         correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
         misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
@@ -586,12 +590,19 @@ class Processor:
 
             # set chandelier cell weights / reset AIS weights to help search input space
             self.AIS.ais = self.initalAISWeights.copy()
+            if (self.countEXTERNAL_MOVE+1) % 5 == 0: # periodically reset threshold to prevent it getting skewed too hard
+                self.threshold[:] = -1
             totalValOfTargsFound = 0
             for i in targetIndxs:
                 totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
             searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
             P = np.exp(-self.countEXTERNAL_MOVE/searchFactor)
             if P > np.random.default_rng().random():
+
+                #####################33 IAM HERE!!!!!!!! need to complete if/else to adjust chc weights
+                #### Create fail safe logic to ensure exploration of total input space in else statement!!!
+                change = -5 # Note once calc interference is constructed use feedback from confidence around each to dynamically determine change
+                self.attachedChC.change_Synapse_Weight(connection=, change=)
                 # search close to targs found i.e. decrease chc weights near targ
             else:
                 # search far away targets found i.e. decrease chc weights farther away
@@ -669,6 +680,8 @@ class Processor:
         belowThresh = belowThresh[belowThresh!=0]
 
         uValue, pValue = stats.wilcoxon(aboveThresh, belowThresh)
+
+        #############3333 use dynamic feedback to calc chc weight change in external move!!!!!
 
         # key concept in wilcoxon rank sum test uValue ranges from 0 (= complete sepatation) to n1*n2 (= no separation) where n1 and n2 are number of samples from each distribution (here size of receptive field).  Note, bc of the threshold splitting above and below the uValue will be zero.  The pValue though tells the probability that this is true.
         return min(1/pValue, self.maxFiringRateOutput)
