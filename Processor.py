@@ -136,6 +136,11 @@ class Processor:
         # build ais
         self.AIS = AIS(pShape, attachedChC)
 
+        # Collect initial weights arrays
+        self.initalAISWeights = self.AIS.ais.copy()
+        ChCWeightsOnly = self.calcWeights()
+        self.initialChCWeights = ChCWeightsOnly.copy()
+
 
     @staticmethod
     def buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4,
@@ -197,10 +202,6 @@ class Processor:
                            incomplete i.e. less than sparse lower bound
                            indicating ambiguity.
         '''
-
-        self.initalAISWeights = self.AIS.ais.copy()
-        ChCWeightsOnly = self.calcWeights()
-        self.initialChCWeights = ChCWeightsOnly.copy()
 
         targetIndxs, confidenceFlag = self.applyReceptiveField()
 
@@ -547,7 +548,7 @@ class Processor:
         '''
 
         originalInput = self.pShape.input_array.copy()
-        print('targetindxs external move', sorted(targetIndxs))
+        print('targetIndxs external move', sorted(targetIndxs))
 
         # For debugging and visulization
         targsNotFoundYet = list(set(self.pShape.activeElements) - set(targetIndxs))
@@ -589,23 +590,35 @@ class Processor:
             # self.pShape.display_Polygon(self.pShape.input_array, plotTitle='after external move')
 
             # set chandelier cell weights / reset AIS weights to help search input space
+            change = -5 #######!!!!!!!! Note once calc interference is constructed use feedback from confidence around each to dynamically determine change parameter
             self.AIS.ais = self.initalAISWeights.copy()
             if (self.countEXTERNAL_MOVE+1) % 5 == 0: # periodically reset threshold to prevent it getting skewed too hard
                 self.threshold[:] = -1
             totalValOfTargsFound = 0
+            print('iiii', targetIndxs)
             for i in targetIndxs:
+                print('i', i)
                 totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
             searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
+            if searchFactor == 0:
+                searchFactor = 1 # to prevent division by zero
             P = np.exp(-self.countEXTERNAL_MOVE/searchFactor)
             if P > np.random.default_rng().random():
-
-                #####################33 IAM HERE!!!!!!!! need to complete if/else to adjust chc weights
-                #### Create fail safe logic to ensure exploration of total input space in else statement!!!
-                change = -5 # Note once calc interference is constructed use feedback from confidence around each to dynamically determine change
-                self.attachedChC.change_Synapse_Weight(connection=, change=)
-                # search close to targs found i.e. decrease chc weights near targ
+                neighborhood = self.collectNearbyIndices(targetIndxs)
+                for idx in neighborhood:
+                    c = (idx, self.attachedChC.PyC[idx])
+                    self.attachedChC.change_Synapse_Weight(connection=c,
+                                                           change=change)
             else:
+                for i in range(20):
+                    x = np.random.randint(self.pShape.input_array.shape[0])
+                    y = np.random.randint(self.pShape.input_array.shape[1])
+                    idx = (x, y)
+                    c = (idx, self.attachedChC.PyC[idx])
+                    self.attachedChC.change_Synapse_Weight(connection=c,
+                                                           change=change)
                 # search far away targets found i.e. decrease chc weights farther away
+                # Note this is basic function to achieve crude search to refine after calc interference made
 
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
@@ -639,24 +652,51 @@ class Processor:
                 self.pShape.input_array[idx[0], idx[1]] = np.maximum(val, 0)
                 redistribute -= val
 
-        # Reconstruct blurring and noise - default is same levels as initial
-        # input but can be adjusted to simulate changes to better or worse
-        # external environment noise.
-        # (i.e. adjustment away from default represents crude knobs to tune
-        # for lateral connectivity between columns)
+        # Reconstruct blur and noise - default is same as initial input.
+        # (adjustment from default represents crude knobs to simulate information
+        # conveyed via lateral connectivity between columns)
         if blur:
-            self.pShape.blur_Array(sigma=self.gaussBlurSigma)
+            self.pShape.blur_Array(sigma=blur)
         else:
             self.pShape.blur_Array(sigma=self.gaussBlurSigma)
         if arrayNoise:
+            self.pShape.add_Noise(scale=arrayNoise)
+        else:
             self.pShape.add_Noise(scale=self.noiseLevel)
-
 
 
         return
 
-# np.mean(self.pShape.input_array)
-# self.trueTargs
+
+    def collectNearbyIndices(self, targetIndxs):
+        '''Helper function to grab nearby target indices.
+        Inputs:
+        targetIndxs - list of indices
+        Returns:
+        neighborhood - list of indices in the neighborhood (including) target indices
+        '''
+
+        neighborhood = []
+        for i in targetIndxs:
+            if i[0] == 0:
+                row_s = 1
+            elif i[0] == self.pShape.input_array.shape[0]:
+                row_s = self.pShape.input_array.shape[0] - 1
+            else:
+                row_s = i[0]
+            if i[1] == 0:
+                col_s = 1
+            elif i[1] == self.pShape.input_array.shape[1]:
+                col_s = self.pShape.input_array.shape[1] - 1
+            else:
+                col_s = i[1]
+            for i in range(row_s-1, row_s+2):
+                for j in range(col_s-1, col_s+2):
+                    if (i, j) not in neighborhood:
+                        neighborhood.append((i, j))
+
+        return neighborhood
+
 
     def calcInterference(self, result, threshold):
         '''Examine values within receptive field and calculate interference to

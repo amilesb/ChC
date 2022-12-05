@@ -198,13 +198,13 @@ class TestProcessor(unittest.TestCase):
         self.processor.sparseNum['low'] = 10
 
         # Test1 first if conditional
-        sdrTag, indxs = self.processor.externalMove([0, 0])
+        sdrTag, indxs = self.processor.externalMove([(0, 0)])
         assert sdrTag == True
         assert self.processor.countEXTERNAL_MOVE == 2
 
         # Test2 second if conditional
         self.processor.correctTargsFound.clear()
-        sdrTag, indxs = self.processor.externalMove([0, 0])
+        sdrTag, indxs = self.processor.externalMove([(0, 0)])
         assert sdrTag == False
         # print('test external move: count external move', self.processor.countEXTERNAL_MOVE)
         assert self.processor.countEXTERNAL_MOVE == 4
