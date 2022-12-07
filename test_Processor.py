@@ -210,8 +210,18 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.countEXTERNAL_MOVE == 4
 
 
-    def applyThreshold(self):
+    def test_applyThreshold(self):
         pass
+
+
+    def test_noiseEstimate(self):
+        pass
+
+
+    def test_selectFromMostCommon(self):
+        pass
+
+
 
 
     def test_calcInterference(self):

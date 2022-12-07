@@ -123,16 +123,16 @@ class Polygon:
                     targsNotFoundYet = kwargs.get('targsNotFoundYet')
                     correctHits = kwargs.get('correctHits')
                     misses = kwargs.get('misses')
-                    if targsNotFoundYet:
-                        vis = np.dstack([np.uint8(array), np.uint8(array), np.uint8(array)])
-                        vis = self.setColors(vis, targsNotFoundYet, correctHits, misses)
-                        labels = {1:'targsNotFoundYet', 2:'correctHits', 3:'misses'}
-                        notFoundPatch = mpatches.Patch(color='red', label='targsNotFoundYet')
-                        hitsPatch = mpatches.Patch(color='green', label='correctHits')
-                        missPatch = mpatches.Patch(color='blue', label='misses')
-                        plt.legend(handles=[notFoundPatch, hitsPatch, missPatch],
-                                   bbox_to_anchor=(0.85, -0.01), loc="lower right",
-                                   bbox_transform=fig.transFigure, ncol=3)
+                    # if targsNotFoundYet:
+                    vis = np.dstack([np.uint8(array), np.uint8(array), np.uint8(array)])
+                    vis = self.setColors(vis, targsNotFoundYet, correctHits, misses)
+                    labels = {1:'targsNotFoundYet', 2:'correctHits', 3:'misses'}
+                    notFoundPatch = mpatches.Patch(color='red', label='targsNotFoundYet')
+                    hitsPatch = mpatches.Patch(color='green', label='correctHits')
+                    missPatch = mpatches.Patch(color='blue', label='misses')
+                    plt.legend(handles=[notFoundPatch, hitsPatch, missPatch],
+                               bbox_to_anchor=(0.85, -0.01), loc="lower right",
+                               bbox_transform=fig.transFigure, ncol=3)
                 except NameError:
                     print(kwargs)
                     print('Array:')

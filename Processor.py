@@ -511,10 +511,9 @@ class Processor:
             unchecked = self.pShape.input_array.size-abs(penaltySearch)
             if unchecked <= self.sparseNum['high']:
                 self.internalNoiseFlag = True
-                bestGuess = self.targsINTERNAL.most_common(self.sparseNum['low'])
-                targetIndxs = []
-                for indxAndCount in bestGuess:
-                    targetIndxs.append(indxAndCount[0])
+                noiseEst = self.noiseEstimate(targetIndxs)
+                listLength = np.int_(np.round(self.sparseNum['low']/noiseEst))
+                targetIndxs = self.selectFromMostCommon(listLength)
                 return targetIndxs
             else:
                 return self.internalMove(targetIndxs, clearTargIndxCounter=False)
@@ -526,6 +525,50 @@ class Processor:
         for falseTarg in suspectedFalseTargsDueToNoise:
             self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais towards cell body
             self.threshold[falseTarg] += 0.1*self.pShape.MAX_INPUT # inhibit these cells
+
+
+    def noiseEstimate(self, targetIndxs):
+        '''Estimate noise from total value of targets found versus total
+        value found in input array.
+
+        Inputs:
+        targetIndxs     - list of indices of suspected targets
+
+        Returns:
+        noiseEst        - value equal to total value of targs / sum of input
+        '''
+
+        totalValOfTargsFound = 0
+        for i in targetIndxs:
+            totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
+        noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
+
+        return noiseEst
+
+
+    def selectFromMostCommon(self, listLength):
+        ''' select most common indexes up to a certain list length.
+        Inputs:
+        listLength      - integer number of indices to select
+        Returns:
+        targetIndxs     - list of target indexes selected from most common
+        '''
+
+        bestGuess = self.targsINTERNAL.most_common(listLength)
+        items = []
+        count = []
+        for c in bestGuess:
+            items.append(c[0])
+            count.append(c[1])
+        tot = sum(count)
+        prob = [c/tot for c in count]
+        if self.sparseNum['low'] > self.sparseNum['high']:
+            self.sparseNum['low'] = self.sparseNum['high']
+        num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+        indxIntoItems = np.random.choice(len(items), size=num, replace=False, p=prob)
+        targetIndxs = [items[indx] for indx in indxIntoItems]
+
+        return targetIndxs
 
 
     def externalMove(self, targetIndxs):
@@ -595,9 +638,7 @@ class Processor:
             if (self.countEXTERNAL_MOVE+1) % 5 == 0: # periodically reset threshold to prevent it getting skewed too hard
                 self.threshold[:] = -1
             totalValOfTargsFound = 0
-            print('iiii', targetIndxs)
             for i in targetIndxs:
-                print('i', i)
                 totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
             searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
             if searchFactor == 0:
@@ -690,8 +731,8 @@ class Processor:
                 col_s = self.pShape.input_array.shape[1] - 1
             else:
                 col_s = i[1]
-            for i in range(row_s-1, row_s+2):
-                for j in range(col_s-1, col_s+2):
+            for i in range(row_s-1, row_s+1):
+                for j in range(col_s-1, col_s+1):
                     if (i, j) not in neighborhood:
                         neighborhood.append((i, j))
 

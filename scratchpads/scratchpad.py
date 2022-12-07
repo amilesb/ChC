@@ -64,9 +64,32 @@ class Scratchpad():
             self.internalMove([(newIndx, newIndx)])
 
 
+    def commonPick(self):
+        best = Counter(apple=1, banana=2, melon=3, orange=4)
+        bestGuess = best.most_common(10)
+        items = []
+        count = []
+        for c in bestGuess:
+            items.append(c[0])
+            count.append(c[1])
+        tot = sum(count)
+        prob = [c/tot for c in count]
+        print(count, 'c')
+        print('prob', prob)
+
+        print('bg',bestGuess)
+        print('itmes', items)
+        print('count', count)
+
+        targetIndxs = np.random.choice(items, size=20,
+                                       replace=True, p=prob)
+        print(targetIndxs)
+
+
 if __name__ == '__main__':
 
     scratch = Scratchpad()
     # scratch.internalMove([('aa', 'aa')])
     # scratch.argpart()
     # scratch.gauss_blur()
+    scratch.commonPick()
