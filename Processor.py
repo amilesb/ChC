@@ -290,6 +290,7 @@ class Processor:
         elif ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
                or oscFlag==100
               ):
+            print('look i Run')
             confidenceFlag = False
             return possTargIndxs, confidenceFlag
 
@@ -340,7 +341,7 @@ class Processor:
         chcStep = self.pShape.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
         # Check/Set threshold
-        if self.threshold.any() < 0:
+        if np.any(self.threshold < 0):
             self.threshold[:] = np.mean(self.pShape.input_array)/chcStep
 
         result = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
@@ -661,6 +662,9 @@ class Processor:
                 # Note this is basic function to achieve crude search to refine after calc interference made
 
             self.attachedChC.display_Weights()
+
+            Polygon.display_Polygon(self.pShape, self.threshold, 'Threshold values')
+
 
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
