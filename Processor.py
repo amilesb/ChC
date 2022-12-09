@@ -281,7 +281,7 @@ class Processor:
             filterIndxs = [tuple(x) for x in indxs.tolist()]
 
         likelyTargIndxs = list(set(filterIndxs) & set(targetIndxs))
-        # possTargIndxs = list(set(filterIndxs) ^ set(targetIndxs))
+        possTargIndxs = list(set(filterIndxs) | set(targetIndxs))
 
         # Recursive base case return value
         if self.sparseNum['low'] <= len(likelyTargIndxs) <= self.sparseNum['high']:
@@ -291,7 +291,7 @@ class Processor:
                or oscFlag==100
               ):
             confidenceFlag = False
-            return targetIndxs, confidenceFlag
+            return possTargIndxs, confidenceFlag
 
         # Base case criteria not met; set parameters and initiate recursive search
         oscFlagUpdated = self.noiseAdjustments(targetsFound, prevTargetsFound,
@@ -475,7 +475,6 @@ class Processor:
         self.countINTERNAL_MOVE += 1
         originalInput = self.pShape.input_array.copy()
 
-        print('internal move', self.countINTERNAL_MOVE)
         self.targsINTERNAL.update(targetIndxs)
 
         for i in range(numSaccades):
@@ -507,7 +506,7 @@ class Processor:
             self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
             self.pShape.input_array = originalInput.copy() # restore input to re-process with noisy input cells thresholded out
             targetIndxs, confidenceFlag = self.applyReceptiveField()
-            penaltySearch = len(self.targsINTERNAL) * self.countINTERNAL_MOVE * (2*self.sparseNum['low']-self.sparseNum['high'])
+            penaltySearch = len(self.targsINTERNAL) * np.exp(self.countINTERNAL_MOVE)#* (np.exp(self.sparseNum['low']/self.sparseNum['high']))
             unchecked = self.pShape.input_array.size-abs(penaltySearch)
             if unchecked <= self.sparseNum['high']:
                 self.internalNoiseFlag = True
@@ -591,7 +590,7 @@ class Processor:
         '''
 
         originalInput = self.pShape.input_array.copy()
-        print('targetIndxs external move', sorted(targetIndxs))
+        # print('targetIndxs external move', sorted(targetIndxs))
 
         # For debugging and visulization
         targsNotFoundYet = list(set(self.pShape.activeElements) - set(targetIndxs))

@@ -36,7 +36,7 @@ def createFigure1():
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
         P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i/2,
-                            noiseLevel=i/2, display=True, pShape=pShape,
+                            noiseLevel=1.5, display=True, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))
@@ -46,7 +46,7 @@ def createFigure1():
         externalN.append(P_Noise.countEXTERNAL_MOVE)
 
         end = time.time()
-        print(f'time for noise with standard deviation equal to {i+1} added: {end-start:.1f}s')
+        print(f'time for noise with standard deviation equal to {i/2} added: {end-start:.1f}s')
 
 
 ##### figure out why second display is happening!!

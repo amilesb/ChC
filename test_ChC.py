@@ -320,6 +320,10 @@ class TestChC(unittest.TestCase):
 
         assert self.ChCs == chand_dict2
 
+
+    def test_display_Weights(self):
+        pass
+
     # def check_ChCs(self):
     # PLACEHOLDER  -- NOT IMPLEMENTED IN ChC module
     #     # while chc_connect_more60%inputspace: disconnect ChC update PyC

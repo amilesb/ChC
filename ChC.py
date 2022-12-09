@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from pprint import pprint
 import random
 
@@ -318,6 +319,26 @@ class ChC:
         for pyc_pt in self.PyC_points:
             connected_chcs = self.PyC[pyc_pt]
             connected_chcs.sort(key=lambda x: list(x.keys())[0])
+
+
+    def display_Weights(self):
+        '''Simple function to display total weight attached to each input cell.
+        '''
+
+        totalWeights = np.zeros((self.HT, self.WD))
+
+        for i in range(self.HT):
+            for j in range(self.WD):
+                totalWeights[i, j] = self.total_Synapse_Weight((i, j))
+
+        fig = plt.figure()
+                    # plt.legend(handles=[notFoundPatch, hitsPatch, missPatch],
+                    #            bbox_to_anchor=(0.85, -0.01), loc="lower right",
+                    #            bbox_transform=fig.transFigure, ncol=3)
+        plt.title('Total ChC weight')
+        plt.imshow(totalWeights, interpolation='nearest')
+        plt.show()
+
 
 
 class AIS:
