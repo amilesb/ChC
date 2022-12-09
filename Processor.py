@@ -660,6 +660,8 @@ class Processor:
                 # search far away targets found i.e. decrease chc weights farther away
                 # Note this is basic function to achieve crude search to refine after calc interference made
 
+            self.attachedChC.display_Weights()
+
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0

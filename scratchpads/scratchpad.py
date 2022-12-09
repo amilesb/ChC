@@ -86,10 +86,27 @@ class Scratchpad():
         print(targetIndxs)
 
 
+    def recrusiveCounter(self, i):
+        print('at start of recursion', self.counterTest)
+
+        if i == 10:
+            return
+
+
+        if i%2 == 0:
+            self.counterTest.update(['apples', 'oranges'])
+        else:
+            self.counterTest.update(['apples'])
+        i += 1
+        self.recrusiveCounter(i)
+
+
 if __name__ == '__main__':
 
     scratch = Scratchpad()
     # scratch.internalMove([('aa', 'aa')])
     # scratch.argpart()
     # scratch.gauss_blur()
-    scratch.commonPick()
+    # scratch.commonPick()
+    scratch.recrusiveCounter(0)
+    print('after recursive function exit', scratch.counterTest)
