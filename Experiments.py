@@ -35,8 +35,8 @@ def createFigure1():
 
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i/2,
-                            noiseLevel=1.5, display=True, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=1.2,
+                            noiseLevel=1.2, display=True, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))

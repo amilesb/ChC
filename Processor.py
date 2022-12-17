@@ -290,7 +290,6 @@ class Processor:
         elif ( (self.sparseNum['low'] <= targetsFound <= self.sparseNum['high'])
                or oscFlag==100
               ):
-            print('look i Run')
             confidenceFlag = False
             return possTargIndxs, confidenceFlag
 
@@ -306,7 +305,7 @@ class Processor:
         '''Helper function to retrieve ChC weights and adjust according to AIS
         placement.'''
 
-        RF_AvgToMax = np.mean(self.pShape.input_array)/self.pShape.MAX_INPUT
+        RF_AvgToMax = 1 # to collect total active weight for ChC
 
         numRows = self.pShape.input_array.shape[0]
         numCols = self.pShape.input_array.shape[1]
@@ -340,13 +339,18 @@ class Processor:
 
         chcStep = self.pShape.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
-        # Check/Set threshold
+        # Check/Set threshold to sparseNum['high']th biggest value 
         if np.any(self.threshold < 0):
-            self.threshold[:] = np.mean(self.pShape.input_array)/chcStep
+            self.threshold[:] = np.partition(self.pShape.input_array.flatten(),
+                                             -self.sparseNum['high'])[-self.sparseNum['high']]
 
         result = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
 
         result = self.pShape.input_array - (chcStep*weightsAIS)
+
+        self.pShape.display_Polygon(chcStep*weightsAIS, 'chcstep*weightsAIS')
+        self.pShape.display_Polygon(self.pShape.input_array, 'input array')
+        self.pShape.display_Polygon(self.threshold, 'Threshold')
         binaryInputPiece = np.where(result > self.threshold, 1, 0)
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)

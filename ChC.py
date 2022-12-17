@@ -336,7 +336,7 @@ class ChC:
                     #            bbox_to_anchor=(0.85, -0.01), loc="lower right",
                     #            bbox_transform=fig.transFigure, ncol=3)
         plt.title('Total ChC weight')
-        plt.imshow(totalWeights, interpolation='nearest')
+        plt.imshow(totalWeights, cmap='gray')
         plt.show()
 
 
