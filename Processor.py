@@ -261,11 +261,14 @@ class Processor:
         self.countAPPLY_RF += 1
 
         weightsAIS = self.calcWeights()
+        self.pShape.display_Polygon(weightsAIS, 'weightsAIS')
 
         # Custom filter; This filter is designed to combat high noise
         binaryInputPiece, targetsFound = self.applyThreshold(weightsAIS)
         row, col = self.getNonzeroIndices(binaryInputPiece)
         targetIndxs = [(r, c) for r, c in zip(row, col)]
+        print('stopping here', targetIndxs)
+        self.pShape.display_Polygon(binaryInputPiece, 'binaryInputPiece')
 
         # Moving average filter; note this filter while effective falls prey to high noise
         if oscFlag%10 == 0:
@@ -301,11 +304,10 @@ class Processor:
         return self.applyReceptiveField(prevTargetsFound, oscFlagUpdated, filterIndxs)
 
 
-    def calcWeights(self, adjustWeightsAIS=True):
+    def calcWeights(self, adjustWeightsAIS=True, RF_AvgToMax=1):
         '''Helper function to retrieve ChC weights and adjust according to AIS
-        placement.'''
-
-        RF_AvgToMax = 1 # to collect total active weight for ChC
+        placement.  Note, RF_AvgToMax set to 1 collects total active weight for
+        ChC.'''
 
         numRows = self.pShape.input_array.shape[0]
         numCols = self.pShape.input_array.shape[1]
@@ -339,18 +341,15 @@ class Processor:
 
         chcStep = self.pShape.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
 
-        # Check/Set threshold to sparseNum['high']th biggest value 
+        # Check/Set threshold to sparseNum['high']th biggest value
         if np.any(self.threshold < 0):
             self.threshold[:] = np.partition(self.pShape.input_array.flatten(),
                                              -self.sparseNum['high'])[-self.sparseNum['high']]
 
-        result = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
-
+        result = np.zeros([self.pShape.input_array.shape[0],
+                           self.pShape.input_array.shape[1]])
         result = self.pShape.input_array - (chcStep*weightsAIS)
 
-        self.pShape.display_Polygon(chcStep*weightsAIS, 'chcstep*weightsAIS')
-        self.pShape.display_Polygon(self.pShape.input_array, 'input array')
-        self.pShape.display_Polygon(self.threshold, 'Threshold')
         binaryInputPiece = np.where(result > self.threshold, 1, 0)
 
         targetsFound = np.count_nonzero(binaryInputPiece > 0)
@@ -575,7 +574,7 @@ class Processor:
         return targetIndxs
 
 
-    def externalMove(self, targetIndxs):
+    def externalMove(self, targetIndxs, allPrevTargIndxs=None):
         '''External movement to simulate changing gradients across input space.
         Note this is a recursive function built on top of 2 nested recursive
         functions (internalMove and applyReceptiveField).
@@ -586,12 +585,12 @@ class Processor:
                             simulate AIS length changing) self.threshold
 
         Returns:
-        targetIndxs       - list of row, col indices for found targets
         sdrFoundWholeFlag - Boolean indicating that if true then indexes
                             corresponding to SDR match the lower bound of ground
                             truth indices.  If false, targetIndxs will be
                             incomplete i.e. less than sparse lower bound
                             indicating ambiguity.
+        suspectedTargs    - list of row, col indices for found targets
         '''
 
         originalInput = self.pShape.input_array.copy()
@@ -607,21 +606,9 @@ class Processor:
                                         correctHits=correctHits, misses=misses
                                        )
 
-        # THIS ISN't PLOTTING CORRECTLY!!!!!! i.e. not updating bc inside recursion!!!
-        # # For debugging and visulization
-        # targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
-        # correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
-        # misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
-        # plotTitle=f'External Movement Target Indexes'
-        # self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
-        #                                 targsNotFoundYet=targsNotFoundYet,
-        #                                 correctHits=correctHits, misses=misses
-        #                                )
-
-
         while True:
 
-            suspectedTargs = set(targ for targ in targetIndxs)
+            suspectedTargs = set(targ for targ in targetIndxs)|allPrevTargIndxs
             correctTargs = suspectedTargs & self.trueTargs
             incorrect = suspectedTargs - self.trueTargs
 
@@ -629,9 +616,10 @@ class Processor:
             self.falseTargsFound.update(incorrect)
 
             if len(correctTargs) >= self.sparseNum['low']:
-                return True, list(correctTargs)
-            if len(self.correctTargsFound) >= self.sparseNum['low']:
-                return False, list(correctTargs)
+                if len(suspectedTargs) > self.sparseNum['high']:
+                    return False, list(suspectedTargs)
+                else:
+                    return True, list(suspectedTargs)
 
             self.simulateExternalMove(self.noiseLevel)
             # self.pShape.display_Polygon(self.pShape.input_array, plotTitle='after external move')
@@ -667,9 +655,6 @@ class Processor:
 
             self.attachedChC.display_Weights()
 
-            Polygon.display_Polygon(self.pShape, self.threshold, 'Threshold values')
-
-
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0
@@ -679,7 +664,8 @@ class Processor:
 
             self.pShape.input_array = originalInput.copy()
 
-            return self.externalMove(newIndxs)
+            return self.externalMove(targetIndxs=newIndxs,
+                                     allPrevTargIndxs=suspectedTargs)
 
 
     def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):
