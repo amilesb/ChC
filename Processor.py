@@ -279,7 +279,7 @@ class Processor:
             weightsFilter[weightsFilter==0] = 1
             weightsFilter = weightsAIS/weightsFilter
             normWeighted = self.pShape.input_array-(rawFilter*weightsFilter)
-            num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+            num = self.selectNum()
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             filterIndxs = [tuple(x) for x in indxs.tolist()]
 
@@ -458,6 +458,22 @@ class Processor:
         return dist
 
 
+    def selectNum(self):
+        '''Helper function to select integer number of targets.
+        Returns a random number between sparseLow and sparseHigh multiplied by
+        self.countEXTERNAL_MOVE and updates self.num to store the number selected.
+        '''
+
+        num1 = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+        num2 = num1*self.countEXTERNAL_MOVE
+        if not self.num:
+            self.num = num2
+        elif num2 < self.num:
+            num2 = self.num + num1
+        self.num = num2
+
+        return num2
+
     def internalMove(self, targetIndxs, clearTargIndxCounter=True,
                      numSaccades=5, noiseFilter=3):
         '''Internal movement to sift out noise.  Note this is a recursive
@@ -629,27 +645,27 @@ class Processor:
             self.AIS.ais = self.initalAISWeights.copy()
             if (self.countEXTERNAL_MOVE+1) % 5 == 0: # periodically reset threshold to prevent it getting skewed too hard
                 self.threshold[:] = -1
-            totalValOfTargsFound = 0
-            for i in targetIndxs:
-                totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
-            searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
-            if searchFactor == 0:
-                searchFactor = 1 # to prevent division by zero
-            P = np.exp(-self.countEXTERNAL_MOVE/searchFactor)
-            if P > np.random.default_rng().random():
-                neighborhood = self.collectNearbyIndices(targetIndxs)
-                for idx in neighborhood:
-                    c = (idx, self.attachedChC.PyC[idx])
-                    self.attachedChC.change_Synapse_Weight(connection=c,
-                                                           change=change)
-            else:
-                for i in range(20):
-                    x = np.random.randint(self.pShape.input_array.shape[0])
-                    y = np.random.randint(self.pShape.input_array.shape[1])
-                    idx = (x, y)
-                    c = (idx, self.attachedChC.PyC[idx])
-                    self.attachedChC.change_Synapse_Weight(connection=c,
-                                                           change=change)
+            # totalValOfTargsFound = 0
+            # for i in targetIndxs:
+            #     totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
+            # searchFactor = totalValOfTargsFound/np.sum(self.pShape.input_array)
+            # if searchFactor == 0:
+            #     searchFactor = 1 # to prevent division by zero
+            # P = np.exp(-self.countEXTERNAL_MOVE/searchFactor)
+            # if P > np.random.default_rng().random():
+            #     neighborhood = self.collectNearbyIndices(targetIndxs)
+            #     for idx in neighborhood:
+            #         c = (idx, self.attachedChC.PyC[idx])
+            #         self.attachedChC.change_Synapse_Weight(connection=c,
+            #                                                change=change)
+            # else:
+            #     for i in range(20):
+            #         x = np.random.randint(self.pShape.input_array.shape[0])
+            #         y = np.random.randint(self.pShape.input_array.shape[1])
+            #         idx = (x, y)
+            #         c = (idx, self.attachedChC.PyC[idx])
+            #         self.attachedChC.change_Synapse_Weight(connection=c,
+            #                                                change=change)
                 # search far away targets found i.e. decrease chc weights farther away
                 # Note this is basic function to achieve crude search to refine after calc interference made
 

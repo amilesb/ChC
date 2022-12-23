@@ -222,7 +222,8 @@ class TestProcessor(unittest.TestCase):
         pass
 
 
-
+    def test_selectNum(self):
+        pass
 
     def test_calcInterference(self):
         pass
