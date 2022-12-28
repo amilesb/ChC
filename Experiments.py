@@ -20,11 +20,11 @@ def createFigure1():
 
     standardizedInputs = dict(array_size=32, numTargets=20,
                               useTargetSubclass=True, maxInput=255,
-                              useVariableTargValue=False)
+                              useVariableTargValue=True)
 
 ##################  NEed to find when I miss by just a few!!!!!!!!!! how to find thme???
 
-    for i in range(7):
+    for i in range(3):
         start = time.time()
         # Simple setup - no noise, blurring, or gradient
         # pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
@@ -35,8 +35,8 @@ def createFigure1():
 
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=1.2,
-                            noiseLevel=1.2, display=True, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i,
+                            noiseLevel=i, display=True, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))
