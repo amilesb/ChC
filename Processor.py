@@ -242,13 +242,40 @@ class Processor:
         return sdrFoundWholeFlag, targetIndxs
 
 
-    def applyReceptiveField(self, learning=True):
+    def refineSDR(self, targs):
+        '''Take given list of targs and adjust thresholding to narrow down to
+        sparser representation of true targets.
+
+        Inputs:
+        targs       - list of target indices to inspect
+
+        Returns:
+        targetIndxs   - list of target indexes restricted to length
+                        sparseNum['high']
+        '''
+            numRows = self.pShape.input_array.shape[0]
+            numCols = self.pShape.input_array.shape[1]
+
+            bin = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
+            for idx in targs:
+                bin[idx[0], idx[1]] = 1
+
+            targetIndxs, _ = self.applyReceptiveField(mode='Refine', mask=bin)
+            targetIndxs = self.internalMove(targetIndxs)
+
+
+
+
+            sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+
+    def applyReceptiveField(self, mode='Seek', mask=None):
         ''' Recursive BIG function returns an array of the same size as the
         receptive field filtered by the self.threshold i.e. generates an SDR!
 
         Inputs:
-        prevTargetsFound - float
-        oscFlag          - Flag to prevent infinite recursion
+        mode           - String equal to 'Seek', 'Refine', or 'Infer'
+        mask           - binary numpy array with which to threshold out
+                         unwanted indices in order to refine a search
 
         Returns:
         targetIndxs      - list of row, col indices for found targets
@@ -258,26 +285,29 @@ class Processor:
 
         self.countAPPLY_RF += 1
 
-        step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         weightsAIS = self.calcWeights()
-        weightsAdjusted = self.pShape.input_array-weightsAIS
-        weightsAdjusted[weightsAdjusted<0] = 0
 
         size = self.pShape.input_array.shape[0]
 
 
-        # Moving average filter; note this filter abstracts out concept of AIS and ChC weights
-        rawFilter = ndimage.uniform_filter(self.pShape.input_array,
-                                           size=size, mode='mirror')
-       ##############33PUT IN AIS MOVEMENT WEIGHT?!?1/1
-        if learning:
-            normWeighted = self.pShape.input_array-(rawFilter)
-        else:
-            weightsFilter = ndimage.uniform_filter(weightsAIS, size=size,
-                                                   mode='mirror')
-            weightsFilter[weightsFilter==0] = 1
-            weightsFilter = weightsAIS/weightsFilter
-            normWeighted = self.pShape.input_array-(rawFilter*weightsAIS)
+        # Process input with moving average filter; note the use of the filter
+        # in 'Seek' and 'Refine' abstracts out concept of AIS and ChC weights
+        if mode=='Seek':
+            rawFilter = ndimage.uniform_filter(self.pShape.input_array,
+                                               size=size, mode='mirror')
+            normWeighted = self.pShape.input_array-rawFilter
+        elif mode=='Refine':
+            thresholded = self.pShape.input_array.copy()*mask
+            thresholdedFilter = ndimage.uniform_filter(thresholded, size=size,
+                                                       mode='mirror'
+            normWeighted = thresholded-thresholdedFilter
+        elif mode=='Infer':
+            step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+            weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
+            weightsAdjusted[weightsAdjusted<0] = 0
+            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
+                                                    mode='mirror')
+            normWeighted = weightsAdjusted-adjustedFilter
         num = self.selectNum()
         if num > self.pShape.input_array.size:
             num = self.pShape.input_array.size
@@ -289,7 +319,7 @@ class Processor:
         return targetIndxs, False
 
 
-    def calcWeights(self, adjustWeightsAIS=True, RF_AvgToMax=1):
+    def calcWeights(self, RF_AvgToMax=1):
         '''Helper function to retrieve ChC weights and adjust according to AIS
         placement.  Note, RF_AvgToMax set to 1 collects total active weight for
         ChC.'''
@@ -302,7 +332,6 @@ class Processor:
             for j in range(numCols):
                 weights[i, j] = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
                                                                      avgPercentFR_RF=RF_AvgToMax)
-                if adjustWeightsAIS:
                     weightReduction = self.AIS.ais[i, j]/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
                     weights[i, j] *= (1-weightReduction)
 
