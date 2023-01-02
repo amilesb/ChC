@@ -299,7 +299,7 @@ class Processor:
         elif mode=='Refine':
             thresholded = self.pShape.input_array.copy()*mask
             thresholdedFilter = ndimage.uniform_filter(thresholded, size=size,
-                                                       mode='mirror'
+                                                       mode='mirror')
             normWeighted = thresholded-thresholdedFilter
         elif mode=='Infer':
             step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
