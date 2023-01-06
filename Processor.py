@@ -253,20 +253,22 @@ class Processor:
         targetIndxs   - list of target indexes restricted to length
                         sparseNum['high']
         '''
-            numRows = self.pShape.input_array.shape[0]
-            numCols = self.pShape.input_array.shape[1]
+        numRows = self.pShape.input_array.shape[0]
+        numCols = self.pShape.input_array.shape[1]
 
-            bin = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
-            for idx in targs:
-                bin[idx[0], idx[1]] = 1
+        bin = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
+        for idx in targs:
+            bin[idx[0], idx[1]] = 1
 
-            targetIndxs, _ = self.applyReceptiveField(mode='Refine', mask=bin)
-            targetIndxs = self.internalMove(targetIndxs)
+        targetIndxs, _ = self.applyReceptiveField(mode='Refine', mask=bin)
+        targetIndxs = self.internalMove(targetIndxs)
+
+################33  need to implement refineSDR  PROCESS is
+# during learning extract --> refine --> sdr acquired store in chc weights
+### during inference extract SDR with applyRF mode = inference, if match success use if not enter learning mode
 
 
-
-
-            sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
 
     def applyReceptiveField(self, mode='Seek', mask=None):
         ''' Recursive BIG function returns an array of the same size as the
@@ -293,18 +295,22 @@ class Processor:
         # Process input with moving average filter; note the use of the filter
         # in 'Seek' and 'Refine' abstracts out concept of AIS and ChC weights
         if mode=='Seek':
-            rawFilter = ndimage.uniform_filter(self.pShape.input_array,
-                                               size=size, mode='mirror')
+            rawFilter = ndimage.uniform_filter(self.pShape.input_array, size=size,
+                                               mode='mirror')
             normWeighted = self.pShape.input_array-rawFilter
         elif mode=='Refine':
+            if mask==None:
+                print('Failed to set mask before refining in applyRF')
             thresholded = self.pShape.input_array.copy()*mask
-            thresholdedFilter = ndimage.uniform_filter(thresholded, size=size)
+            thresholdedFilter = ndimage.uniform_filter(thresholded, size=size,
+                                                       mode='mirror')
             normWeighted = thresholded-thresholdedFilter
         elif mode=='Infer':
             step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
             weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
             weightsAdjusted[weightsAdjusted<0] = 0
-            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size)
+            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
+                                                    mode='mirror')
             normWeighted = weightsAdjusted-adjustedFilter
         num = self.selectNum()
         if num > self.pShape.input_array.size:
@@ -330,8 +336,8 @@ class Processor:
             for j in range(numCols):
                 weights[i, j] = self.attachedChC.total_Active_Weight(PyC_array_element=(i,j),
                                                                      avgPercentFR_RF=RF_AvgToMax)
-                    weightReduction = self.AIS.ais[i, j]/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-                    weights[i, j] *= (1-weightReduction)
+                weightReduction = self.AIS.ais[i, j]/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+                weights[i, j] *= (1-weightReduction)
 
         return weights
 
