@@ -298,15 +298,13 @@ class Processor:
             normWeighted = self.pShape.input_array-rawFilter
         elif mode=='Refine':
             thresholded = self.pShape.input_array.copy()*mask
-            thresholdedFilter = ndimage.uniform_filter(thresholded, size=size,
-                                                       mode='mirror')
+            thresholdedFilter = ndimage.uniform_filter(thresholded, size=size)
             normWeighted = thresholded-thresholdedFilter
         elif mode=='Infer':
             step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
             weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
             weightsAdjusted[weightsAdjusted<0] = 0
-            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
-                                                    mode='mirror')
+            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size)
             normWeighted = weightsAdjusted-adjustedFilter
         num = self.selectNum()
         if num > self.pShape.input_array.size:
