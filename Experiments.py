@@ -24,7 +24,7 @@ def createFigure1():
 
 ##################  NEed to find when I miss by just a few!!!!!!!!!! how to find thme???
 
-    for i in range(3):
+    for i in range(10):
         start = time.time()
         # Simple setup - no noise, blurring, or gradient
         # pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
@@ -35,14 +35,15 @@ def createFigure1():
 
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i,
-                            noiseLevel=i, display=True, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i/2,
+                            noiseLevel=i/2, display=False, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))
         sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR()
         applyRF_N.append(P_Noise.countAPPLY_RF)
         internalN.append(P_Noise.countINTERNAL_MOVE)
+        # internalN.append(P_Noise.internalMovesCounter)
         externalN.append(P_Noise.countEXTERNAL_MOVE)
 
         end = time.time()

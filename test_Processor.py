@@ -228,6 +228,9 @@ class TestProcessor(unittest.TestCase):
     def test_calcInterference(self):
         pass
 
+    def displayInputSearch(self):
+        pass
+
 
 
 
