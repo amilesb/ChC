@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 from unittest import mock
 from pprint import pprint
+from collections import Counter
 
 from ChC import ChC, AIS
 from Encoder import Encoder
@@ -32,9 +33,10 @@ class TestProcessor(unittest.TestCase):
         self.cornerStart = 0, 5
 
         trueTargs = np.where(self.intValArray > 0, 1, 0)
-        row, col = self.processor.getNonzeroIndices(trueTargs)
+        row, col = trueTargs.nonzero()[0], trueTargs.nonzero()[1]
         trueTargs = [(r, c) for r, c in zip(row, col)]
         self.processor.trueTargs = set(trueTargs)
+        self.processor.trueTargsList = trueTargs
         self.processor.pShape.activeElements = trueTargs
         self.processor.totTargVal = np.sum(self.intValArray)
         # self.intValArray = np.array([[1, 1, 2, 2, 2, 5, 5, 5, 5, 5],
@@ -47,6 +49,16 @@ class TestProcessor(unittest.TestCase):
         #                              [1, 3, 2, 1, 1, 9, 9, 9, 9, 9],
         #                              [3, 3, 3, 1, 0, 9, 9, 9, 9, 9],
         #                              [1, 3, 1, 0, 1, 5, 5, 5, 5, 5]])
+
+
+    def test_buildPolygonAndAttachChC(self):
+        '''NOTE this test includes an test of calcSalience function.'''
+        pShape, attachedChC = self.processor.buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4, y=4, wd=4, ht=3, angle=0)
+
+        assert pShape.input_array.size == 100
+        assert len(attachedChC.ChC_Coordinates) == 10
+
+
     def test_extractSDR(self):
         # this represents an end to end test bc it is the master function call
         self.pShape.input_array = self.intValArray
@@ -61,12 +73,14 @@ class TestProcessor(unittest.TestCase):
         assert len(targetIndxs) == 10
 
 
-    def test_buildPolygonAndAttachChC(self):
-        '''NOTE this test includes an test of calcSalience function.'''
-        pShape, attachedChC = self.processor.buildPolygonAndAttachChC(array_size=10, form='rectangle', x=4, y=4, wd=4, ht=3, angle=0)
+    def test_refineSDR(self):
+        print('need to implement test refineSDR')
+        pass
 
-        assert pShape.input_array.size == 100
-        assert len(attachedChC.ChC_Coordinates) == 10
+
+    def test_splitTargs(self):
+        print('need to implement test splitTargs')
+        pass
 
 
     def test_applyReceptiveField(self):
@@ -91,74 +105,26 @@ class TestProcessor(unittest.TestCase):
         assert len(targetIndxs) == 10
 
 
-    def test_moveAIS(self):
-        binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
-        direction = 'decrease'
-        for i in range(40):
-            self.processor.moveAIS(binaryInputPiece, direction)
-
-        assert self.processor.AIS.ais.any() == 0
-
-        direction = 'increase'
-        for i in range(50):
-            self.processor.moveAIS(binaryInputPiece, direction)
-
-        testArray = np.ones((self.intValArray.shape[0], self.intValArray.shape[1]))
-        testArray *= 40
-
-        assert self.processor.AIS.ais.all() == testArray.all()
+    def test_calcWeights(self):
+        print('need to implement test calcWeights')
+        pass
 
 
-    def test_adjustThreshold(self):
-        # Test up
-        binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
-        self.processor.threshold = np.ndarray((self.intValArray.shape[0],
-                                               self.intValArray.shape[1]))
-        self.processor.threshold[0:9] = 10
-        self.processor.threshold[9:] = 5
+    def test_selectNum(self):
+        self.processor.countEXTERNAL_MOVE = 5
+        num = self.processor.selectNum()
+        assert num == 6 * self.processor.sparseNum['low']
 
-        for direction in ['up', 'down']:
-            self.processor.adjustThreshold(binaryInputPiece, direction)
-
-            for i in range(10):
-                for j in range(10):
-                    if i < 9:
-                        assert self.processor.threshold[i, j] == 11
-                    else:
-                        assert self.processor.threshold[i, j] == 6
-            # Reset for 'down' 2nd case
-            binaryInputPiece = np.where(self.intValArray > 10e10, 1, 0)
-            self.processor.threshold[0:9] = 12
-            self.processor.threshold[9:] = 7
-
-
-    def test_getNonzeroIndices(self):
-        array = np.zeros((10, 10))
-        for i in range(10):
-            for j in range(10):
-                if i == j:
-                    array[i, j] = 5
-
-        row, col = self.processor.getNonzeroIndices(array)
-
-        for i in range(10):
-            assert row[i] == i
-            assert col[i] == i
-
-
-    def test_computeMinDist(self):
-        miss = (1,1)
-        hits = [(1,4), (1,7), (4,1), (4,4), (4,7), (8,0)]
-        dist = self.processor.computeMinDist(miss, hits)
-
-        assert dist == 3
+        self.processor.num = 105
+        num = self.processor.selectNum()
+        print(num)
+        assert num == 105 + self.processor.sparseNum['low']
 
 
     @mock.patch('Processor.Processor.applyReceptiveField')
     def test_internalMove(self, mockedApply):
         mockedApply.return_value = ([(i, i) for i in range(5, 10)], True)
         self.processor.pShape.input_array = np.ones((10, 10))
-        self.processor.threshold = np.ones((10, 10))
         indxs = [(i, i) for i in range(5)]
         self.processor.sparseNum['low'] = 4
         self.processor.sparseNum['high'] = 20
@@ -168,32 +134,35 @@ class TestProcessor(unittest.TestCase):
         assert targetIndxs == [(i, i) for i in range(5, 10)]
         assert self.processor.internalNoiseFlag == False
 
-        for i in range(10):
-            for j in range(10):
-                if (i, j) not in mockedApply.return_value[0]:
-                    mockedApply.return_value[0].append((i, j))
-        # TEST2 force internal move to rely on safety exit of recursion
+        # TEST2 force internal move to execute else block
         self.processor.sparseNum['low'] = 21
         targetIndxs = self.processor.internalMove(indxs)
 
-        assert len(targetIndxs) == self.processor.sparseNum['low']
+        assert len(targetIndxs) == len(indxs) + len(mockedApply.return_value[0])
         assert self.processor.internalNoiseFlag == True
+
+
+    def test_selectFromMostCommon(self):
+        self.processor.targsINTERNAL = Counter('abcde')
+        targetIndxs = self.processor.selectFromMostCommon(10)
+
+        assert len(targetIndxs) == 5
 
 
     @mock.patch('Processor.Processor.internalMove')
     @mock.patch('Processor.Processor.applyReceptiveField')
     def test_externalMove(self, mockedApply, mockedInternal):
-        trueTargs = np.where(self.intValArray > 0, 1, 0)
-        row, col = self.processor.getNonzeroIndices(trueTargs)
-        trueTargs = [(r, c) for r, c in zip(row, col)]
-        self.processor.trueTargs = set(trueTargs)
+        # trueTargs = np.where(self.intValArray > 0, 1, 0)
+        # row, col = self.processor.getNonzeroIndices(trueTargs)
+        # trueTargs = [(r, c) for r, c in zip(row, col)]
+        # self.processor.trueTargs = set(trueTargs)
 
         mockedApply.return_value = ([], True)
         mockedInternal.side_effect = [
                                        [(i, i) for i in range(5, 10)],
                                        self.processor.trueTargs,
-                                       trueTargs[0:4],
-                                       trueTargs[4:]
+                                       self.processor.trueTargsList[0:4],
+                                       self.processor.trueTargsList[4:]
                                      ]
         self.processor.sparseNum['low'] = 10
 
@@ -210,29 +179,84 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.countEXTERNAL_MOVE == 4
 
 
-    def test_applyThreshold(self):
+    def test_simulateExternalMove(self):
+        print('need to implement test simulateExternalMove')
         pass
 
-
-    def test_noiseEstimate(self):
-        pass
-
-
-    def test_selectFromMostCommon(self):
-        pass
-
-
-    def test_selectNum(self):
-        pass
 
     def test_calcInterference(self):
+        print('need to implement test calcInterference')
         pass
 
-    def displayInputSearch(self):
-        pass
+
 
 
 
 
 if __name__ == '__main__':
     unittest.main()
+
+
+    # def test_adjustThreshold(self):
+    #     # Test up
+    #     binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
+    #     self.processor.threshold = np.ndarray((self.intValArray.shape[0],
+    #                                            self.intValArray.shape[1]))
+    #     self.processor.threshold[0:9] = 10
+    #     self.processor.threshold[9:] = 5
+    #
+    #     for direction in ['up', 'down']:
+    #         self.processor.adjustThreshold(binaryInputPiece, direction)
+    #
+    #         for i in range(10):
+    #             for j in range(10):
+    #                 if i < 9:
+    #                     assert self.processor.threshold[i, j] == 11
+    #                 else:
+    #                     assert self.processor.threshold[i, j] == 6
+    #         # Reset for 'down' 2nd case
+    #         binaryInputPiece = np.where(self.intValArray > 10e10, 1, 0)
+    #         self.processor.threshold[0:9] = 12
+    #         self.processor.threshold[9:] = 7
+
+
+
+    # def test_computeMinDist(self):
+    #     miss = (1,1)
+    #     hits = [(1,4), (1,7), (4,1), (4,4), (4,7), (8,0)]
+    #     dist = self.processor.computeMinDist(miss, hits)
+    #
+    #     assert dist == 3
+
+
+    # def test_getNonzeroIndices(self):
+    #     array = np.zeros((10, 10))
+    #     for i in range(10):
+    #         for j in range(10):
+    #             if i == j:
+    #                 array[i, j] = 5
+    #
+    #     row, col = self.processor.getNonzeroIndices(array)
+    #
+    #     for i in range(10):
+    #         assert row[i] == i
+    #         assert col[i] == i
+
+
+
+    # def test_moveAIS(self):
+    #     binaryInputPiece = np.where(self.intValArray > -1, 1, 0)
+    #     direction = 'decrease'
+    #     for i in range(40):
+    #         self.processor.moveAIS(binaryInputPiece, direction)
+    #
+    #     assert self.processor.AIS.ais.any() == 0
+    #
+    #     direction = 'increase'
+    #     for i in range(50):
+    #         self.processor.moveAIS(binaryInputPiece, direction)
+    #
+    #     testArray = np.ones((self.intValArray.shape[0], self.intValArray.shape[1]))
+    #     testArray *= 40
+    #
+    #     assert self.processor.AIS.ais.all() == testArray.all()

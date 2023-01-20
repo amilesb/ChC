@@ -235,6 +235,8 @@ class Processor:
         #
         # if objectToTrain == 'topo':
         #     self.trainTopo()
+# during learning extract --> refine --> sdr acquired store in chc weights
+### during inference extract SDR with applyRF mode = inference, if match success use if not enter learning mode
 
 
         return sdrFoundWholeFlag, targetIndxs
@@ -256,9 +258,7 @@ class Processor:
         if not numReduce:
             numReduce = np.random.randint(len(targs)-self.sparseNum['high']+1)
 
-        random.shuffle(targs)
-        targsCut = targs[:numReduce]
-        refinedTargIndxs = targs[numReduce:]
+        targsCut, refinedTargIndxs = self.splitTargs(targs, numReduce)
 
         suspectedTargs = set(targ for targ in refinedTargIndxs)
         correctTargs = suspectedTargs & self.trueTargs
@@ -273,7 +273,25 @@ class Processor:
             numReduce = max(1, np.int(np.floor(numReduce/2)))
             self.countREFINE_SDR += 1
             return self.refineSDR(prevTargs, numReduce)
-        #
+
+
+    def splitTargs(self, targs, numReduce):
+        '''Function to split targets into 2 piles: ones to cut and ones to keep.
+
+        Inputs:
+        targs               - list of target indices
+        numReduce           - integer value of how many targs to cut
+
+        Returns:
+        targsCut            - list of target indices cut
+        refinedTargIndxs    - list of target indices kept
+        '''
+
+        random.shuffle(targs)
+        targsCut = targs[:numReduce]
+        refinedTargIndxs = targs[numReduce:]
+
+        # Holding for potential future reference if desire to use more sophisticated logic than random search
         # # Move AIS to bias network to only look at supsected targets
         # for indx in self.attachedChC.PyC_points:
         #     if indx in targs:
@@ -281,41 +299,8 @@ class Processor:
         #         self.attachedChC
         #     else:
         #         self.AIS.ais[indx] = 0
-        #
-        # numRefine = len(targs)-numReduce
-        # if numRefine < self.sparseNum['low']:
-        #     numRefine = self.sparseNum['low']
-        #
-        # print('numRefine', numRefine)
-        #
-        # targetIndxs, _ = self.applyReceptiveField('Refine', targs, numRefine)
-        # suspectedTargs = set(targ for targ in targetIndxs)
-        # correctTargs = suspectedTargs & self.trueTargs
-        # print('len correct', len(correctTargs))
-        # print('len suspect', len(suspectedTargs))
-        #
-        # if  self.sparseNum['low'] <= len(correctTargs):
-        #     if len(suspectedTargs) <= self.sparseNum['high']: # Base case
-        #         return targetIndxs
-        #     else: # Continue Refining
-        #         if accelerate:
-        #             numReduce += 1
-        #             self.refineSDR(targetIndxs, numReduce, True)
-        #         else:
-        #             self.refineSDR(targetIndxs, numReduce, False)
-        # else: # At least 1 correct target was refined out
-        #     print('seeya')
-        #     accelerate = False
-        #     numReduce = 1
-        #     self.simulateExternalMove(self.noiseLevel)
-        #     self.countEXTERNAL_MOVE += 1
-        #     self.refineSDR(targetIndxs, numReduce, accelerate)
 
-################33  need to implement refineSDR  PROCESS is
-# during learning extract --> refine --> sdr acquired store in chc weights
-### during inference extract SDR with applyRF mode = inference, if match success use if not enter learning mode
-
-
+        return targsCut, refinedTargIndxs
 
 
     def applyReceptiveField(self, mode='Seek', refineTargs=None, numRefine=1):
@@ -462,50 +447,31 @@ class Processor:
                 targetIndxs = self.selectFromMostCommon(listLength)
                 return targetIndxs
 
-        # if self.sparseNum['low'] <= len(targetIndxs):# <= (self.countINTERNAL_MOVE+1)*self.sparseNum['high']:
-        #     self.internalNoiseFlag = False
-        #     return targetIndxs
-        # else:
-        #     if mode == 'inference':
-        #         self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
-        #         self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
-        #         targetIndxs, confidenceFlag = self.applyReceptiveField()
-        #     penaltySearch = len(self.targsINTERNAL) * np.exp(self.countEXTERNAL_MOVE)* (np.exp(self.sparseNum['low']/self.sparseNum['high']))
-        #     unchecked = self.pShape.input_array.size-abs(penaltySearch)
-        #     print('uncheck', unchecked)
-        #     if unchecked <= self.sparseNum['high']:
-        #         self.internalNoiseFlag = True
-        #         listLength = np.int_(self.sparseNum['high']*(self.countEXTERNAL_MOVE+1))
-        #         print('liistleng', listLength)
-        #         targetIndxs = self.selectFromMostCommon(listLength)
-        #         return targetIndxs
-        #     else:
-        #         return self.internalMove(targetIndxs, clearTargIndxCounter=False)
+
+    # def noiseEstimate(self, targetIndxs):
+    #     '''Estimate noise from total value of targets found versus total
+    #     value found in input array.
+    #
+    #     Inputs:
+    #     targetIndxs     - list of indices of suspected targets
+    #
+    #     Returns:
+    #     noiseEst        - value equal to total value of targs / sum of input
+    #     '''
+    #
+    #     totalValOfTargsFound = 0
+    #     for i in targetIndxs:
+    #         totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
+    #     noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
+    #
+    #     return noiseEst
 
 
-    def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
-        '''Helper function to remove suspected false targets from consideration.'''
-
-        for falseTarg in suspectedFalseTargsDueToNoise:
-            self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
-
-    def noiseEstimate(self, targetIndxs):
-        '''Estimate noise from total value of targets found versus total
-        value found in input array.
-
-        Inputs:
-        targetIndxs     - list of indices of suspected targets
-
-        Returns:
-        noiseEst        - value equal to total value of targs / sum of input
-        '''
-
-        totalValOfTargsFound = 0
-        for i in targetIndxs:
-            totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
-        noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
-
-        return noiseEst
+    # def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
+    #     '''Helper function to remove suspected false targets from consideration.'''
+    #
+    #     for falseTarg in suspectedFalseTargsDueToNoise:
+    #         self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
 
 
     def selectFromMostCommon(self, listLength):
@@ -527,6 +493,8 @@ class Processor:
         if self.sparseNum['low'] > self.sparseNum['high']:
             self.sparseNum['low'] = self.sparseNum['high']
         num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+        if num > len(bestGuess):
+            num = len(bestGuess)
         indxIntoItems = np.random.choice(len(items), size=num, replace=False, p=prob)
         targetIndxs = [items[indx] for indx in indxIntoItems]
 
@@ -596,7 +564,6 @@ class Processor:
             # self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             # self.countINTERNAL_MOVE = 0
 
-
             self.pShape.input_array = originalInput.copy()
 
             return self.externalMove(targetIndxs=newIndxs,
@@ -634,36 +601,6 @@ class Processor:
             self.pShape.add_Noise(scale=arrayNoise)
         else:
             self.pShape.add_Noise(scale=self.noiseLevel)
-
-
-    def collectNearbyIndices(self, targetIndxs):
-        '''Helper function to grab nearby target indices.
-        Inputs:
-        targetIndxs - list of indices
-        Returns:
-        neighborhood - list of indices in the neighborhood (including) target indices
-        '''
-
-        neighborhood = []
-        for i in targetIndxs:
-            if i[0] == 0:
-                row_s = 1
-            elif i[0] == self.pShape.input_array.shape[0]:
-                row_s = self.pShape.input_array.shape[0] - 1
-            else:
-                row_s = i[0]
-            if i[1] == 0:
-                col_s = 1
-            elif i[1] == self.pShape.input_array.shape[1]:
-                col_s = self.pShape.input_array.shape[1] - 1
-            else:
-                col_s = i[1]
-            for i in range(row_s-1, row_s+1):
-                for j in range(col_s-1, col_s+1):
-                    if (i, j) not in neighborhood:
-                        neighborhood.append((i, j))
-
-        return neighborhood
 
 
     def calcInterference(self, result, threshold):
@@ -840,7 +777,34 @@ class Processor:
     #     return dist
 
 
-
+    # def collectNearbyIndices(self, targetIndxs):
+    #     '''Helper function to grab nearby target indices.
+    #     Inputs:
+    #     targetIndxs - list of indices
+    #     Returns:
+    #     neighborhood - list of indices in the neighborhood (including) target indices
+    #     '''
+    #
+    #     neighborhood = []
+    #     for i in targetIndxs:
+    #         if i[0] == 0:
+    #             row_s = 1
+    #         elif i[0] == self.pShape.input_array.shape[0]:
+    #             row_s = self.pShape.input_array.shape[0] - 1
+    #         else:
+    #             row_s = i[0]
+    #         if i[1] == 0:
+    #             col_s = 1
+    #         elif i[1] == self.pShape.input_array.shape[1]:
+    #             col_s = self.pShape.input_array.shape[1] - 1
+    #         else:
+    #             col_s = i[1]
+    #         for i in range(row_s-1, row_s+1):
+    #             for j in range(col_s-1, col_s+1):
+    #                 if (i, j) not in neighborhood:
+    #                     neighborhood.append((i, j))
+    #
+    #     return neighborhood
 
 
 
@@ -867,3 +831,29 @@ class Processor:
         #                                                change=change)
             # search far away targets found i.e. decrease chc weights farther away
             # Note this is basic function to achieve crude search to refine after calc interference made
+
+
+
+
+
+
+# From internal move
+        # if self.sparseNum['low'] <= len(targetIndxs):# <= (self.countINTERNAL_MOVE+1)*self.sparseNum['high']:
+        #     self.internalNoiseFlag = False
+        #     return targetIndxs
+        # else:
+        #     if mode == 'inference':
+        #         self.suspectFalseTargsInternal.update(suspectedFalseTargsDueToNoise)
+        #         self.thresholdOutSuspFalseTargs(suspectedFalseTargsDueToNoise)
+        #         targetIndxs, confidenceFlag = self.applyReceptiveField()
+        #     penaltySearch = len(self.targsINTERNAL) * np.exp(self.countEXTERNAL_MOVE)* (np.exp(self.sparseNum['low']/self.sparseNum['high']))
+        #     unchecked = self.pShape.input_array.size-abs(penaltySearch)
+        #     print('uncheck', unchecked)
+        #     if unchecked <= self.sparseNum['high']:
+        #         self.internalNoiseFlag = True
+        #         listLength = np.int_(self.sparseNum['high']*(self.countEXTERNAL_MOVE+1))
+        #         print('liistleng', listLength)
+        #         targetIndxs = self.selectFromMostCommon(listLength)
+        #         return targetIndxs
+        #     else:
+        #         return self.internalMove(targetIndxs, clearTargIndxCounter=False)
