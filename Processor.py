@@ -80,6 +80,7 @@ class Processor:
         self.countAPPLY_RF = 0
         self.countINTERNAL_MOVE = 0
         self.countEXTERNAL_MOVE = 0
+        self.countREFINE_SDR = 0
         self.internalNoiseFlag = False
         self.targsINTERNAL = Counter()
         self.suspectFalseTargsInternal = Counter()
@@ -210,28 +211,19 @@ class Processor:
         print('finished internalMove', targetIndxs)
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+        print('finished externalMove', targetIndxs)
 
         if plot:
             self.displayInputSearch()
-
-        # targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
-        # correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
-        # misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
-        # plotTitle=f'External Movement Target Indexes'
-        # self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
-        #                                 targsNotFoundYet=targsNotFoundYet,
-        #                                 correctHits=correctHits, misses=misses
-        #                                )
 
         if sdrFoundWholeFlag:
             # Reward chandelier cell weights for those target indices and save these as abstract SDR X.
             print('sdrFoundWholeFlag!!!')
             pass
         else: # Refine indxs to produce SDR
-            print('Refining!')
-            self.refineSDR(targetIndxs)
-
-
+            refinedTargIndxs = self.refineSDR(targetIndxs)
+            print('finished refining', refinedTargIndxs)
+            print('correctomundo', self.trueTargs)
 
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
@@ -248,7 +240,7 @@ class Processor:
         return sdrFoundWholeFlag, targetIndxs
 
 
-    def refineSDR(self, targs, PERCENT_REFINE=0.1, accelerate=True):
+    def refineSDR(self, targs, numReduce=None):
         '''Take given list of targs and adjust thresholding to narrow down to
         sparser representation of true targets.
 
@@ -260,38 +252,64 @@ class Processor:
                         sparseNum['high']
         '''
 
-        # Move AIS to bias network to only look at supsected targets
-        for indx in self.attachedChC.PyC_points:
-            if indx in targs:
-                self.AIS.ais[indx] = self.AIS.MAX
-            else:
-                self.AIS.ais[indx] = 0
+        prevTargs = targs.copy()
+        if not numReduce:
+            numReduce = np.random.randint(len(targs)-self.sparseNum['high']+1)
 
-        numRefine = len(targs) - np.round(PERCENT_REFINE*len(targs))
-        if numRefine < self.sparseNum['low']:
-            numRefine = self.sparseNum['low']
-        if numRefine == len(targs):
-            numRefine = len(targs)-1
+        random.shuffle(targs)
+        targsCut = targs[:numReduce]
+        refinedTargIndxs = targs[numReduce:]
 
-        targetIndxs, _ = self.applyReceptiveField('Refine', targs, numRefine)
-        suspectedTargs = set(targ for targ in targetIndxs)
+        suspectedTargs = set(targ for targ in refinedTargIndxs)
         correctTargs = suspectedTargs & self.trueTargs
 
-        if  self.sparseNum['low'] <= len(correctTargs):
-            prevAccelerate = accelerate
-            accelerate = True
+        if self.sparseNum['low'] <= len(correctTargs):
             if len(suspectedTargs) <= self.sparseNum['high']: # Base case
-                return targetIndxs
+                print('hello i refined')
+                return refinedTargIndxs
             else: # Continue Refining
-                if prevAccelerate:
-                    PERCENT_REFINE *= 2
-                self.refineSDR(targetIndxs, PERCENT_REFINE, accelerate)
+                return self.refineSDR(refinedTargIndxs)
         else: # At least 1 correct target was refined out
-            accelerate = False
-            PERCENT_REFINE /= 2
-            self.simulateExternalMove(self.noiseLevel)
-            self.countEXTERNAL_MOVE += 1
-            self.refineSDR(targetIndxs, PERCENT_REFINE, accelerate)
+            numReduce = max(1, np.int(np.floor(numReduce/2)))
+            self.countREFINE_SDR += 1
+            return self.refineSDR(prevTargs, numReduce)
+        #
+        # # Move AIS to bias network to only look at supsected targets
+        # for indx in self.attachedChC.PyC_points:
+        #     if indx in targs:
+        #         self.AIS.ais[indx] = self.AIS.MAX
+        #         self.attachedChC
+        #     else:
+        #         self.AIS.ais[indx] = 0
+        #
+        # numRefine = len(targs)-numReduce
+        # if numRefine < self.sparseNum['low']:
+        #     numRefine = self.sparseNum['low']
+        #
+        # print('numRefine', numRefine)
+        #
+        # targetIndxs, _ = self.applyReceptiveField('Refine', targs, numRefine)
+        # suspectedTargs = set(targ for targ in targetIndxs)
+        # correctTargs = suspectedTargs & self.trueTargs
+        # print('len correct', len(correctTargs))
+        # print('len suspect', len(suspectedTargs))
+        #
+        # if  self.sparseNum['low'] <= len(correctTargs):
+        #     if len(suspectedTargs) <= self.sparseNum['high']: # Base case
+        #         return targetIndxs
+        #     else: # Continue Refining
+        #         if accelerate:
+        #             numReduce += 1
+        #             self.refineSDR(targetIndxs, numReduce, True)
+        #         else:
+        #             self.refineSDR(targetIndxs, numReduce, False)
+        # else: # At least 1 correct target was refined out
+        #     print('seeya')
+        #     accelerate = False
+        #     numReduce = 1
+        #     self.simulateExternalMove(self.noiseLevel)
+        #     self.countEXTERNAL_MOVE += 1
+        #     self.refineSDR(targetIndxs, numReduce, accelerate)
 
 ################33  need to implement refineSDR  PROCESS is
 # during learning extract --> refine --> sdr acquired store in chc weights
@@ -316,28 +334,33 @@ class Processor:
         '''
 
         self.countAPPLY_RF += 1
-
-        weightsAIS = self.calcWeights()
-
         size = self.pShape.input_array.shape[0]
 
-        rawFilter = ndimage.uniform_filter(self.pShape.input_array, size=size,
-                                           mode='mirror')
-        normWeighted = self.pShape.input_array-rawFilter
-
         # Process input with moving average filter; note, this is abstraction of
-        # AIS and ChC weights bc can arbitrarily select out top 'num'!
+        # AIS and ChC weights bc arbitrarily selects out top 'num'!
         if mode=='Seek':
+            rawFilter = ndimage.uniform_filter(self.pShape.input_array, size=size,
+                                               mode='mirror')
+            normWeighted = self.pShape.input_array-rawFilter
             num = self.selectNum()
             if num > self.pShape.input_array.size:
                 num = self.pShape.input_array.size
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
+        else:
+            weightsAIS = self.calcWeights()
+            step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+            weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
+            weightsAdjusted[weightsAdjusted<0] = 0
+            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
+                                                    mode='mirror')
+            normWeighted = weightsAdjusted-adjustedFilter
 
-        elif mode=='Refine':
+        if mode=='Refine':
             if refineTargs==None:
                 print('Failed to set target indices to refine in applyRF mode=Refine')
-            indxSort = np.c_[np.unravel_index(np.sort(normWeighted.ravel()), normWeighted.shape)]
+            indxSort = np.c_[np.unravel_index(np.argsort(normWeighted.ravel())[::-1], normWeighted.shape)]
+            indxSort = [tuple(x) for x in indxSort.tolist()]
             targetIndxs=[]
             i=0
             while len(targetIndxs) <= numRefine or i<normWeighted.size:
@@ -346,13 +369,7 @@ class Processor:
                 i += 1
 
         elif mode=='Infer':
-
-            step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-            weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
-            weightsAdjusted[weightsAdjusted<0] = 0
-            adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
-                                                    mode='mirror')
-            normWeighted = weightsAdjusted-adjustedFilter
+            pass
 
         return targetIndxs, False
 
