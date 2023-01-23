@@ -66,7 +66,6 @@ class TestProcessor(unittest.TestCase):
         self.processor.pShape.activeElements = [(1, 1), (1, 4), (1, 5), (3, 0), (4, 1), (4, 5), (4, 6), (5, 5), (5, 6), (7, 8)]
         flag, targetIndxs = self.processor.extractSDR()
 
-
         assert flag == True
         for targ in targetIndxs:
             assert targ in self.processor.trueTargs
@@ -74,13 +73,17 @@ class TestProcessor(unittest.TestCase):
 
 
     def test_refineSDR(self):
-        print('need to implement test refineSDR')
-        pass
+        targs = [(i, j) for i in range(10) for j in range(10)]
+        refinedTargIndxs = self.processor.refineSDR(targs)
+        assert set(refinedTargIndxs) == self.processor.trueTargs
 
 
     def test_splitTargs(self):
-        print('need to implement test splitTargs')
-        pass
+        targs = [i for i in range(100)]
+        targsCut, refinedTargIndxs = self.processor.splitTargs(targs, 10)
+
+        assert len(targsCut) == 10
+        assert len(refinedTargIndxs) == 90
 
 
     def test_applyReceptiveField(self):
@@ -105,9 +108,13 @@ class TestProcessor(unittest.TestCase):
         assert len(targetIndxs) == 10
 
 
-    def test_calcWeights(self):
-        print('need to implement test calcWeights')
-        pass
+    @mock.patch('ChC.ChC.total_Active_Weight')
+    def test_calcWeights(self, mockedTotalActiveWeight):
+        mockedTotalActiveWeight.return_value = 10
+        weights = self.processor.calcWeights()
+
+        assert weights[0, 0] == 5
+
 
 
     def test_selectNum(self):
@@ -117,7 +124,6 @@ class TestProcessor(unittest.TestCase):
 
         self.processor.num = 105
         num = self.processor.selectNum()
-        print(num)
         assert num == 105 + self.processor.sparseNum['low']
 
 
@@ -167,21 +173,22 @@ class TestProcessor(unittest.TestCase):
         self.processor.sparseNum['low'] = 10
 
         # Test1 first if conditional
-        sdrTag, indxs = self.processor.externalMove([(0, 0)])
+        sdrTag, indxs = self.processor.externalMove(self.processor.trueTargsList)
         assert sdrTag == True
-        assert self.processor.countEXTERNAL_MOVE == 2
 
-        # Test2 second if conditional
-        self.processor.correctTargsFound.clear()
+        # Test2 Recursive Test
         sdrTag, indxs = self.processor.externalMove([(0, 0)])
         assert sdrTag == False
-        # print('test external move: count external move', self.processor.countEXTERNAL_MOVE)
-        assert self.processor.countEXTERNAL_MOVE == 4
+        assert self.processor.countEXTERNAL_MOVE == 2
 
 
     def test_simulateExternalMove(self):
-        print('need to implement test simulateExternalMove')
-        pass
+        initalTargVal = np.sum(self.intValArray)
+        self.processor.simulateExternalMove(noiseLevel=0, blur=0, arrayNoise=0)
+        finalTargVal = np.sum(self.processor.pShape.input_array)
+
+        assert np.where(self.intValArray > 0, 1, 0).all() == np.where(self.processor.pShape.input_array > 0, 1, 0).all()
+        assert initalTargVal == finalTargVal
 
 
     def test_calcInterference(self):

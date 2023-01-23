@@ -214,7 +214,7 @@ class Processor:
         print('finished externalMove', targetIndxs)
 
         if plot:
-            self.displayInputSearch()
+            self.displayInputSearch(plotTitle='From externalMove Target Indices')
 
         if sdrFoundWholeFlag:
             # Reward chandelier cell weights for those target indices and save these as abstract SDR X.
@@ -265,12 +265,11 @@ class Processor:
 
         if self.sparseNum['low'] <= len(correctTargs):
             if len(suspectedTargs) <= self.sparseNum['high']: # Base case
-                print('hello i refined')
                 return refinedTargIndxs
             else: # Continue Refining
                 return self.refineSDR(refinedTargIndxs)
         else: # At least 1 correct target was refined out
-            numReduce = max(1, np.int(np.floor(numReduce/2)))
+            numReduce = max(1, int(np.floor(numReduce/2)))
             self.countREFINE_SDR += 1
             return self.refineSDR(prevTargs, numReduce)
 
@@ -534,14 +533,7 @@ class Processor:
             self.falseTargsFound.update(incorrect)
 
             # For debugging and visulization
-            # targsNotFoundYet = list(set(self.pShape.activeElements) - suspectedTargs)
-            # correctHits = list(set(self.pShape.activeElements) & suspectedTargs)
-            # misses = list(incorrect)
-            # plotTitle=f'From External Movement Target Indexes'
-            # self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
-            #                                 targsNotFoundYet=targsNotFoundYet,
-            #                                 correctHits=correctHits, misses=misses
-            #                                )
+            # self.displayInputSearch(self, plotTitle='from internalMove Target Indices')                             )
 
             if len(correctTargs) >= self.sparseNum['low']:
                 if len(suspectedTargs) > self.sparseNum['high']:
@@ -632,12 +624,11 @@ class Processor:
         return min(1/pValue, self.maxFiringRateOutput)
 
 
-    def displayInputSearch(self):
+    def displayInputSearch(self, plotTitle='Target Indices'):
 
         targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))
         correctHits = list(set(self.pShape.activeElements) & set(self.correctTargsFound))
         misses = list(set(self.falseTargsFound) - set(self.pShape.activeElements))
-        plotTitle=f'External Movement Target Indexes'
         self.pShape.display_Polygon(self.pShape.input_array, plotTitle,
                                         targsNotFoundYet=targsNotFoundYet,
                                         correctHits=correctHits, misses=misses
