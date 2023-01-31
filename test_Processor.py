@@ -72,20 +72,6 @@ class TestProcessor(unittest.TestCase):
         assert len(targetIndxs) == 10
 
 
-    def test_refineSDR(self):
-        targs = [(i, j) for i in range(10) for j in range(10)]
-        refinedTargIndxs = self.processor.refineSDR(targs)
-        assert set(refinedTargIndxs) == self.processor.trueTargs
-
-
-    def test_splitTargs(self):
-        targs = [i for i in range(100)]
-        targsCut, refinedTargIndxs = self.processor.splitTargs(targs, 10)
-
-        assert len(targsCut) == 10
-        assert len(refinedTargIndxs) == 90
-
-
     def test_applyReceptiveField(self):
         array_MAX=9
         self.pShape.input_array = self.intValArray
@@ -114,7 +100,6 @@ class TestProcessor(unittest.TestCase):
         weights = self.processor.calcWeights()
 
         assert weights[0, 0] == 5
-
 
 
     def test_selectNum(self):
@@ -191,6 +176,33 @@ class TestProcessor(unittest.TestCase):
         assert initalTargVal == finalTargVal
 
 
+    def test_refineSDR(self):
+        targs = [(i, j) for i in range(10) for j in range(10)]
+        refinedTargIndxs = self.processor.refineSDR(targs)
+        assert set(refinedTargIndxs) == self.processor.trueTargs
+
+
+    def test_splitTargs(self):
+        targs = [i for i in range(100)]
+        targsCut, refinedTargIndxs = self.processor.splitTargs(targs, 10)
+
+        assert len(targsCut) == 10
+        assert len(refinedTargIndxs) == 90
+
+
+    def updateChCWeightsMatchedToSDR(self):
+        print('need to implement test updateChCWeightsMatchedToSDR')
+        pass
+
+
+    def test_computeMinDist(self):
+        miss = (1,1)
+        hits = [(1,4), (1,7), (4,1), (4,4), (4,7), (8,0)]
+        dist = self.processor.computeMinDist(miss, hits)
+
+        assert dist == 3
+
+
     def test_calcInterference(self):
         print('need to implement test calcInterference')
         pass
@@ -228,12 +240,7 @@ if __name__ == '__main__':
 
 
 
-    # def test_computeMinDist(self):
-    #     miss = (1,1)
-    #     hits = [(1,4), (1,7), (4,1), (4,4), (4,7), (8,0)]
-    #     dist = self.processor.computeMinDist(miss, hits)
-    #
-    #     assert dist == 3
+
 
 
     # def test_getNonzeroIndices(self):

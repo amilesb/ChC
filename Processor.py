@@ -217,13 +217,16 @@ class Processor:
             self.displayInputSearch(plotTitle='From externalMove Target Indices')
 
         if sdrFoundWholeFlag:
+            refinedTargIndxs = targetIndxs
             # Reward chandelier cell weights for those target indices and save these as abstract SDR X.
             print('sdrFoundWholeFlag!!!')
-            pass
         else: # Refine indxs to produce SDR
             refinedTargIndxs = self.refineSDR(targetIndxs)
             print('finished refining', refinedTargIndxs)
             print('correctomundo', self.trueTargs)
+
+
+        self.updateChCWeightsMatchedToSDR(self, refinedTargIndxs)
 
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
@@ -240,66 +243,6 @@ class Processor:
 
 
         return sdrFoundWholeFlag, targetIndxs
-
-
-    def refineSDR(self, targs, numReduce=None):
-        '''Take given list of targs and adjust thresholding to narrow down to
-        sparser representation of true targets.
-
-        Inputs:
-        targs         - list of target indices to inspect
-
-        Returns:
-        targetIndxs   - list of target indexes restricted to length
-                        sparseNum['high']
-        '''
-
-        prevTargs = targs.copy()
-        if not numReduce:
-            numReduce = np.random.randint(len(targs)-self.sparseNum['high']+1)
-
-        targsCut, refinedTargIndxs = self.splitTargs(targs, numReduce)
-
-        suspectedTargs = set(targ for targ in refinedTargIndxs)
-        correctTargs = suspectedTargs & self.trueTargs
-
-        if self.sparseNum['low'] <= len(correctTargs):
-            if len(suspectedTargs) <= self.sparseNum['high']: # Base case
-                return refinedTargIndxs
-            else: # Continue Refining
-                return self.refineSDR(refinedTargIndxs)
-        else: # At least 1 correct target was refined out
-            numReduce = max(1, int(np.floor(numReduce/2)))
-            self.countREFINE_SDR += 1
-            return self.refineSDR(prevTargs, numReduce)
-
-
-    def splitTargs(self, targs, numReduce):
-        '''Function to split targets into 2 piles: ones to cut and ones to keep.
-
-        Inputs:
-        targs               - list of target indices
-        numReduce           - integer value of how many targs to cut
-
-        Returns:
-        targsCut            - list of target indices cut
-        refinedTargIndxs    - list of target indices kept
-        '''
-
-        random.shuffle(targs)
-        targsCut = targs[:numReduce]
-        refinedTargIndxs = targs[numReduce:]
-
-        # Holding for potential future reference if desire to use more sophisticated logic than random search
-        # # Move AIS to bias network to only look at supsected targets
-        # for indx in self.attachedChC.PyC_points:
-        #     if indx in targs:
-        #         self.AIS.ais[indx] = self.AIS.MAX
-        #         self.attachedChC
-        #     else:
-        #         self.AIS.ais[indx] = 0
-
-        return targsCut, refinedTargIndxs
 
 
     def applyReceptiveField(self, mode='Seek', refineTargs=None, numRefine=1):
@@ -595,6 +538,98 @@ class Processor:
             self.pShape.add_Noise(scale=self.noiseLevel)
 
 
+    def refineSDR(self, targs, numReduce=None):
+        '''Take given list of targs and adjust thresholding to narrow down to
+        sparser representation of true targets.
+
+        Inputs:
+        targs         - list of target indices to inspect
+
+        Returns:
+        targetIndxs   - list of target indexes restricted to length
+                        sparseNum['high']
+        '''
+
+        prevTargs = targs.copy()
+        if not numReduce:
+            numReduce = np.random.randint(len(targs)-self.sparseNum['high']+1)
+
+        targsCut, refinedTargIndxs = self.splitTargs(targs, numReduce)
+
+        suspectedTargs = set(targ for targ in refinedTargIndxs)
+        correctTargs = suspectedTargs & self.trueTargs
+
+        if self.sparseNum['low'] <= len(correctTargs):
+            if len(suspectedTargs) <= self.sparseNum['high']: # Base case
+                return refinedTargIndxs
+            else: # Continue Refining
+                return self.refineSDR(refinedTargIndxs)
+        else: # At least 1 correct target was refined out
+            numReduce = max(1, int(np.floor(numReduce/2)))
+            self.countREFINE_SDR += 1
+            return self.refineSDR(prevTargs, numReduce)
+
+
+    def splitTargs(self, targs, numReduce):
+        '''Function to split targets into 2 piles: ones to cut and ones to keep.
+
+        Inputs:
+        targs               - list of target indices
+        numReduce           - integer value of how many targs to cut
+
+        Returns:
+        targsCut            - list of target indices cut
+        refinedTargIndxs    - list of target indices kept
+        '''
+
+        random.shuffle(targs)
+        targsCut = targs[:numReduce]
+        refinedTargIndxs = targs[numReduce:]
+
+        # Holding for potential future reference if desire to use more sophisticated logic than random search
+        # # Move AIS to bias network to only look at supsected targets
+        # for indx in self.attachedChC.PyC_points:
+        #     if indx in targs:
+        #         self.AIS.ais[indx] = self.AIS.MAX
+        #         self.attachedChC
+        #     else:
+        #         self.AIS.ais[indx] = 0
+
+        return targsCut, refinedTargIndxs
+
+
+    def updateChCWeightsMatchedToSDR(self, refinedTargIndxs):
+
+        for indx in self.attachedChC.PyC_points:
+            connection = indx, self.attachedChC.PyC[indx]
+            dist = self.computeMinDist(indx, refinedTargIndxs)
+            if dist==0:
+                self.attachedChC.change_Synapse_Weight(connection, change=-3)
+            elif dist <1.5:
+                self.attachedChC.change_Synapse_Weight(connection, change=-2)
+            elif dist <2.5:
+                self.attachedChC.change_Synapse_Weight(connection, change=-1)
+            elif 5.5 > dist >= 3.5:
+                self.attachedChC.change_Synapse_Weight(connection, change=1)
+            elif 7.5 > dist >= 3.5:
+                self.attachedChC.change_Synapse_Weight(connection, change=2)
+            else:
+                self.attachedChC.change_Synapse_Weight(connection, change=3)
+
+
+    def computeMinDist(self, subject, listOfTargs):
+        '''Helper function to compute distance from thresholded zero elements to
+        farthest distance from ALL postive targets.'''
+        dist = 10e10
+        for targ in listOfTargs:
+            d = np.sqrt((targ[0]-subject[0])**2 + (targ[1]-subject[1])**2)
+            if d < dist:
+                dist = d
+
+        return dist
+
+
+
     def calcInterference(self, result, threshold):
         '''Examine values within receptive field and calculate interference to
         determine how confident receptive field chcStep is.
@@ -756,16 +791,7 @@ class Processor:
     #     return row, col
     #
     #
-    # def computeMinDist(self, subject, listOfTargs):
-    #     '''Helper function to compute distance from thresholded zero elements to
-    #     farthest distance from ALL postive targets.'''
-    #     dist = 10e10
-    #     for targ in listOfTargs:
-    #         d = np.sqrt((targ[0]-subject[0])**2 + (targ[1]-subject[1])**2)
-    #         if d < dist:
-    #             dist = d
-    #
-    #     return dist
+
 
 
     # def collectNearbyIndices(self, targetIndxs):
