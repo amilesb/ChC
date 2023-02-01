@@ -506,7 +506,18 @@ class Processor:
 
 
     def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):
-        '''Helper function to randomly readjust target contrast.'''
+        '''Helper function to randomly readjust target contrast.
+
+        ***************
+        
+        NOTE:
+
+        noiseLevel is a dynamic variable to adjust contrast relative to average
+        (potentially blur and arrayNoise could be controlled by other
+        interneurons)
+
+        ***************
+        '''
 
         # Reset input array
         self.pShape.input_array = self.uncorruptedInput.copy()

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from pprint import pprint
 import random
+from collections import defaultdict
 
 from Polygon import Polygon
 
@@ -20,6 +21,7 @@ class ChC:
         return (f'''This class returns a dictionary which maps chandelier cells
                     to elements in an array.''')
 
+
     def __init__(self, Polygon_Array):
         self.Polygon_Array = Polygon_Array
         self.HT = Polygon_Array.input_array.shape[0]
@@ -31,6 +33,8 @@ class ChC:
         self.MAX_CHC_ATTACHED = 8
         self.MAX_CHC_WEIGHT = 9
         self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT = 40
+        self.objectWeights = defaultdict(int)
+
 
     def attach_ChC_Coords(self, debug=False):
         '''Accepts a Polygon object (numpy array with shape inserted) and returns a
@@ -69,6 +73,7 @@ class ChC:
         self.build_Reciprocal_Map_Of_Input_To_ChC()
 
         return self.ChCs, self.PyC
+
 
     def build_Reciprocal_Map_Of_Input_To_ChC(self):
         '''Constructs a reciprocal connectivity map with synaptic weights from
@@ -137,6 +142,7 @@ class ChC:
                 total += list(chc.values())[0]
 
         return total
+
 
     def find_Max_Connected_ChC(self, attached_chcs):
         '''Takes a list of attached chandelier cells in dictionary form with
@@ -216,6 +222,7 @@ class ChC:
         else:
             return
 
+
     def check_Weight_Change(self, target_tot_wght):
         ''' Check that total weight is between 0 and the total allowed max ChC
         attached weight.  Return the target total weight satisfying the above
@@ -226,6 +233,7 @@ class ChC:
             return self.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
         else:
             return target_tot_wght
+
 
     def select_Chand(self, target_tot_wght, current_tot_wght, attached_chcs):
         '''Creates a weighted list of chandelier cell indexes from the
@@ -256,6 +264,7 @@ class ChC:
             chc_index = random.choices(index, weights=chc_lengths)
 
         return inc, chc_index
+
 
     def update_PyC_and_ChCs_dicts(self, PyC_point, attached_chcs, chc_pt, chc,
                                   FLAG_NEW_CONNECTION):
@@ -313,6 +322,7 @@ class ChC:
             connected_points = self.ChCs[chc_pt]
             connected_points.sort(key=lambda x: list(x.keys())[0])
 
+
     def sort_PyC(self):
         '''For each pyramidal cell column in the input space, this function
         sorts the list of connected chandelier cells for easier viewing.'''
@@ -339,6 +349,16 @@ class ChC:
         plt.imshow(totalWeights, cmap='gray')
         plt.show()
 
+
+    def updateAndStoreWeights(self, objectLabel):
+        '''Takes an abstract object label if one already exists (or creates a
+        new one) and updates (or stores) the ChC weights associated with that
+        object.
+        '''
+
+        self.objectWeights[objectLabel] = self.ChCs
+
+        ### need listener so anytime weights cahngeing both get updated?!
 
 
 class AIS:

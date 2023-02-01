@@ -22,8 +22,6 @@ def createFigure1():
                               useTargetSubclass=True, maxInput=255,
                               useVariableTargValue=True)
 
-##################  NEed to find when I miss by just a few!!!!!!!!!! how to find thme???
-
     for i in range(10):
         start = time.time()
         # Simple setup - no noise, blurring, or gradient
@@ -61,14 +59,86 @@ def createFigure1():
 
 
 
+############## EXPERIMENT 2 #####################
+
+
+
+'''learning a new object consists of activating more and more units until object
+threshold (certain number of target indexes are predicted) reached; then paring
+down until desired sparsity reached (note this may mean some false positives are
+included!!!)
+
+Weights get stored; a new object is learned
+
+new objects keep getting added until threshold of collision with other objects
+is reached.
+
+At this point,network can tighten sparisty to increase stored items OR change
+number of active targets in each object to move towards average value i.e. targ
+with 8 gains new input connections to generate more and targ with 40 loses some.
+'''
+
+''' figure 1 = learning show that network can find target SDR and refine to
+desired with varying levels of noise sparsity (plot # applyRF, externalMove, and
+refineSDR for various noise parameters)
+
+Figure 2 = create objects with varying # of targets 1-1024 show that network
+can store maximal representations with sparsity in range of 20-40
+note, if pattens drawn from random distribution improves robustness i.e. less
+chance collision but if 20 activate pattern a and 19same 1 new activates z
+instead of b then durning inference rearrange
+
+figure 3 = Once objects learned; found faster with weights set
+
+figure 4 = information is abstracted; weight combos enable dynamic selection
+i.e. hierarchical layer recieving inputs as lower level ChC weight SDRs then
+it can learn/predict dynamic combinations -- 2 parts a 1.3 parts b
+(this extends capacity of lower layer!  by itself can only learn small # but
+layer above can blend disinct SDRs to dynamically extend capacity -- also
+removes need for SPARSE SDRs)
+
+figure 5 = interference produces output for FR
+use FR to back project to control learn vs inference
+add noise in input
+
+Create data with no noise or gradient?
+figure 6 = corrupt input so 20 targs but 1 is in wrong location
+demonstrate rewiring
+Increase corruption
+compare to CNN
+
+Figure 7
+Add noise repeat fig 6?
+
+fig ?
+Try MNIST with uncorrupted / corrupted cells see if it can identify how many objects to create?
+
+Couple figs main theory 
+
+Supp figs Theory and HTM review
+
+
+Use feedback from interference in output to determine whether factor should
+bias network to look for targs or instead initiate topographical rearrangement
+(initical plan to implement with count external move?)
+
+
+Things to do:
+collect frames to make movie
+add fxn call in external move to predict (set) chc wieghts and ais
+examine internal move to improve filter ?
+
+
+
+Homeostasis-
+* during inference if too many activated = rearrange
+* during learning if too many activated = refinement
+
+
+'''
 
 
 
 if __name__ == '__main__':
 
     createFigure1()
-
-
-
-# array_size=10, form='rectangle', x=4, y=4, wd=4, ht=3, angle=0,
-# useTargetSubclass=True, numTargets=20, numClusters=0
