@@ -78,6 +78,23 @@ number of active targets in each object to move towards average value i.e. targ
 with 8 gains new input connections to generate more and targ with 40 loses some.
 '''
 
+''' fig 1 = learning
+fig 2 = inference - seq mem and movement
+fig 3 = abstraction - sdr of sdrs; each mc learns weight slider
+fig 4 = invariance - transfer learning
+fig 5 = cycling - fr and feedback to control between learning and inference
+fig 6 = topology - rearranging input in inference
+fig 7 = pruning - learning is always trying to predict more; < 40 RF expands to
+include more potential targs and search; > 40 targs and tighten rf if loses
+sdr then need for topo else can prune
+
+discuss:
+IN and neuromodulators control state transitions
+ChC in L2/3 and L5
+L6
+'''
+
+
 ''' figure 1 = learning show that network can find target SDR and refine to
 desired with varying levels of noise sparsity (plot # applyRF, externalMove, and
 refineSDR for various noise parameters)
@@ -113,7 +130,7 @@ Add noise repeat fig 6?
 fig ?
 Try MNIST with uncorrupted / corrupted cells see if it can identify how many objects to create?
 
-Couple figs main theory 
+Couple figs main theory
 
 Supp figs Theory and HTM review
 

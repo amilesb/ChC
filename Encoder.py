@@ -41,6 +41,8 @@ class Encoder:
         input_piece: a binary numpy array (of square length equal to receptive
                      field size) which arises from a threshold
         location:    x, y coordinates of center of receptive field
+        movement:    x, y tuple representing shifts from previous receptive
+                     field center to new one
 
         Returns:
         multiEncoding: a list representing the concatenated sparse distributed array.
@@ -146,3 +148,49 @@ class Encoder:
         valNumActive, maxValProximity = self.prox_Score(coordinates)
 
         return maxValProximity
+
+
+# class EncoderChC(Encoder):
+#     '''Create a geometric encoder to map active points in 2D space to a fixed
+#     encoding which can then be passed on to a spatial pooling algorithm.'''
+#
+#     def __repr__(self):
+#         return ('''This class accepts a thresholded binary view of the input
+#         space after and then returns an encoding of that input which is then
+#         subsequently ready for spatial pooling analysis.''')
+#
+#
+#     def __init__(self):
+#         ''' input_piece is a binary array which arises from threshold filter(s)
+#         being overlaid on top of the input space and then (combined) to equal
+#         the desired receptive field for the output.'''
+#
+#         self.w = 20 # number of active bits in the encoding - 1
+#         self.n = 300 # number of bits
+#         self.buckets = self.n+1-self.w
+#
+#
+#     def build_Encoding(self, input_piece):
+#         '''Create the multi-encoding of the input space based on 3 implicit
+#         variables.
+#
+#         Inputs:
+#         input_piece: a binary numpy array which arises from a threshold overlaid
+#                      on the input.
+#
+#         Returns:
+#         encoding: a list representing the sparse distributed array.
+#         '''
+#
+#         valInput, coordinates = self.retrieveBinaryValueInputAndCoordinates(input_piece)
+#         valNumActive, valProximity = self.prox_Score(coordinates)
+#         values = [valInput, valNumActive, valProximity]
+#
+#         encoding = []
+#
+#         for type, value in zip(self.variable_types, values):
+#             index = self.compute_Index(type, value)
+#             encoding = np.zeros(self.n)
+#             encoding[index:index+self.w] = 1
+#
+#         return multiEncoding
