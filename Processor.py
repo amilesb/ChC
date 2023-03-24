@@ -191,9 +191,14 @@ class Processor:
         return pShape, attachedChC
 
 
-    def extractSDR(self, plot=True):
+    def extractSDR(self, sdrName=None, plot=True):
         ''' Top level function to control process flow and extract an SDR from
         an input.
+
+        Inputs:
+        sdrName          - string for sdr Object name (default is None to create
+                           new object name)
+        plot             - boolean to display sdr object or not
 
         Returns:
         SDR              - extracted SDR
@@ -225,8 +230,14 @@ class Processor:
             print('finished refining', refinedTargIndxs)
             print('correctomundo', self.trueTargs)
 
+        if sdrName:
+            self.updateChCWeightsMatchedToSDR(refinedTargIndxs, sdrName)
+        else:
+            DIR = 'ChC_handles/Objects'
+            sdrName = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
 
-        self.updateChCWeightsMatchedToSDR(self, refinedTargIndxs)
+        with open(f'ChC_handles/Objects/ChC_{sdrName}', 'wb') as ChC_handle:
+            pickle.dump(attachedChC, ChC_handle)
 
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
@@ -509,7 +520,7 @@ class Processor:
         '''Helper function to randomly readjust target contrast.
 
         ***************
-        
+
         NOTE:
 
         noiseLevel is a dynamic variable to adjust contrast relative to average
@@ -609,7 +620,21 @@ class Processor:
         return targsCut, refinedTargIndxs
 
 
-    def updateChCWeightsMatchedToSDR(self, refinedTargIndxs):
+    def updateChCWeightsMatchedToSDR(self, refinedTargIndxs, sdrName):
+        '''Set weights for attachedChC and store as pickled object.
+
+        Inputs:
+        refinedTargIndxs    - list of target indices kept
+        sdrName             - string to name object
+
+        Returns:
+        None                - function creates or updates existing object
+
+        '''
+
+        if os.path.exists(f'ChC_handles/Objects/ChC_{sdrName}'):
+            with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
+                attachedChC = pickle.load(ChC_handle)
 
         for indx in self.attachedChC.PyC_points:
             connection = indx, self.attachedChC.PyC[indx]
@@ -626,6 +651,9 @@ class Processor:
                 self.attachedChC.change_Synapse_Weight(connection, change=2)
             else:
                 self.attachedChC.change_Synapse_Weight(connection, change=3)
+
+        with open(f'ChC_handles/Objects/ChC_{sdrName}', 'wb') as ChC_handle:
+            pickle.dump(attachedChC, ChC_handle)
 
 
     def computeMinDist(self, subject, listOfTargs):
