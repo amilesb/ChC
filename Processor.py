@@ -14,7 +14,7 @@ from Polygon import Polygon, Target
 #### To do write tests test_extractSDR
 #### Run experiment 1!!!!!
 # story:
-# 1) find targs
+# 1) find targs  = COMPLETED!
 # 2) use sequence memory to find faster
 #     a) sparse levels overlapping so multiple sdrs activated
 # 3) representations need topography as if random then overlapping
@@ -191,8 +191,8 @@ class Processor:
         return pShape, attachedChC
 
 
-    def extractSDR(self, sdrName=None, plot=True):
-        ''' Top level function to control process flow and extract an SDR from
+    def extractSDR(self, plot=True):
+        '''High level function to control process flow and extract an SDR from
         an input.
 
         Inputs:
@@ -221,23 +221,8 @@ class Processor:
         if plot:
             self.displayInputSearch(plotTitle='From externalMove Target Indices')
 
-        if sdrFoundWholeFlag:
-            refinedTargIndxs = targetIndxs
-            # Reward chandelier cell weights for those target indices and save these as abstract SDR X.
-            print('sdrFoundWholeFlag!!!')
-        else: # Refine indxs to produce SDR
-            refinedTargIndxs = self.refineSDR(targetIndxs)
-            print('finished refining', refinedTargIndxs)
-            print('correctomundo', self.trueTargs)
-
-        if sdrName:
-            self.updateChCWeightsMatchedToSDR(refinedTargIndxs, sdrName)
-        else:
-            DIR = 'ChC_handles/Objects'
-            sdrName = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
-
-        with open(f'ChC_handles/Objects/ChC_{sdrName}', 'wb') as ChC_handle:
-            pickle.dump(attachedChC, ChC_handle)
+        if not sdrFoundWholeFlag:
+            targetIndxs = self.refineSDR(targetIndxs)
 
         # firingRateOutput = self.calcInterference(result, self.threshold)
 
@@ -257,8 +242,8 @@ class Processor:
 
 
     def applyReceptiveField(self, mode='Seek', refineTargs=None, numRefine=1):
-        ''' Recursive BIG function returns an array of the same size as the
-        receptive field filtered by the self.threshold i.e. generates an SDR!
+        ''' Computes a 2D moving average to filter over input and extract
+        selectNum number of target indices.
 
         Inputs:
         mode           - String equal to 'Seek', 'Refine', or 'Infer'
@@ -454,7 +439,7 @@ class Processor:
         return targetIndxs
 
 
-    def externalMove(self, targetIndxs, allPrevTargIndxs=None, mode='Seek'):
+    def externalMove(self, targetIndxs, allPrevTargIndxs=None):
         '''External movement to simulate changing gradients across input space.
         Note this is a recursive function built on top of 2 nested recursive
         functions (internalMove and applyReceptiveField).
@@ -620,7 +605,7 @@ class Processor:
         return targsCut, refinedTargIndxs
 
 
-    def updateChCWeightsMatchedToSDR(self, refinedTargIndxs, sdrName):
+    def updateChCWeightsMatchedToSDR(self, refinedTargIndxs, sdrName=None):
         '''Set weights for attachedChC and store as pickled object.
 
         Inputs:
@@ -629,10 +614,15 @@ class Processor:
 
         Returns:
         None                - function creates or updates existing object
-
         '''
 
-        if os.path.exists(f'ChC_handles/Objects/ChC_{sdrName}'):
+        if not sdrName:
+            DIR = 'ChC_handles/Objects'
+            sdrName = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
+            # Save target index list as set
+            with open(f'ChC_handles/Targs/targs_{sdrName}', 'wb') as targs_handle:
+                pickle.dump(self.trueTargs, targs_handle)
+        else:
             with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
                 attachedChC = pickle.load(ChC_handle)
 
@@ -653,7 +643,7 @@ class Processor:
                 self.attachedChC.change_Synapse_Weight(connection, change=3)
 
         with open(f'ChC_handles/Objects/ChC_{sdrName}', 'wb') as ChC_handle:
-            pickle.dump(attachedChC, ChC_handle)
+            pickle.dump(self.attachedChC, ChC_handle)
 
 
     def computeMinDist(self, subject, listOfTargs):
@@ -666,7 +656,6 @@ class Processor:
                 dist = d
 
         return dist
-
 
 
     def calcInterference(self, result, threshold):
@@ -707,6 +696,9 @@ class Processor:
                                         targsNotFoundYet=targsNotFoundYet,
                                         correctHits=correctHits, misses=misses
                                        )
+
+################################################################################
+
 
     # def moveAIS(self, binaryInputPiece, direction, max_wt=40):
     #     '''Helper function to get indices of nonzero elements and adjust AIS
@@ -887,7 +879,6 @@ class Processor:
         #                                                change=change)
             # search far away targets found i.e. decrease chc weights farther away
             # Note this is basic function to achieve crude search to refine after calc interference made
-
 
 
 

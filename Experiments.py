@@ -39,6 +39,7 @@ def createFigure1():
                             )
         print('True Targets', sorted(pShape.activeElements))
         sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR()
+        P_Noise.updateChCWeightsMatchedToSDR(targetIndxs)
         applyRF_N.append(P_Noise.countAPPLY_RF)
         internalN.append(P_Noise.countINTERNAL_MOVE)
         # internalN.append(P_Noise.internalMovesCounter)
