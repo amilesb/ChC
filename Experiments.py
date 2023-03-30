@@ -4,10 +4,11 @@ generate plots for research paper.'''
 import numpy as np
 from matplotlib import pyplot as plt
 import time
+import os
 
 from Processor import Processor
 
-############ EXPERIMENT 1  ############
+############ FIGURE 1  ############
 
 def createFigure1():
 
@@ -22,14 +23,7 @@ def createFigure1():
 
     for i in range(10):
         start = time.time()
-        # Simple setup - no noise, blurring, or gradient
-        # pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        # P = Processor('Exact', sparseHigh=20, pShape=pShape, attachedChC=attachedChC)
-        # sdrFoundWholeFlag, targetIndxs = P.extractSDR()
-        # internal.append(P.countINTERNAL_MOVE)
-        # external.append(P.countEXTERNAL_MOVE)
 
-        # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
         P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=0.01*i,
                             noiseLevel=0.01*i, display=False, pShape=pShape,
@@ -75,12 +69,32 @@ def createFigure1():
 
 
 
-############## EXPERIMENT 2 #####################
+############## FIGURE 2 #####################
 '''Once objects learned; found faster with weights set'''
 
+def createFigure2():
+    # Simple cleaning up
+    DIR1 = 'ChC_handles/Objects'
+    DIR2 = 'ChC_handles/Targs'
 
+    if os.path.isdir(DIR1):
+        for f in os.listdir(DIR1):
+            os.remove(os.path.join(DIR1, f))
+    if os.path.isdir(DIR2):
+        for f in os.listdir(DIR2):
+            os.remove(os.path.join(DIR2, f))
 
-############# EXPERIMENT 3 ######################
+    # # Simple setup - no noise, blurring, or gradient
+    # inputs = dict(array_size=32, numTargets=20, useTargetSubclass=True,
+    #               maxInput=255, useVariableTargValue=False)
+    # for i in range(1000):
+    #     pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
+    #     P = Processor('Exact', sparseHigh=20, pShape=pShape, attachedChC=attachedChC)
+    #     sdrFoundWholeFlag, targetIndxs = P.extractSDR()
+    #     internal.append(P.countINTERNAL_MOVE)
+    #     external.append(P.countEXTERNAL_MOVE)
+
+############# FIGURE 3 ######################
 
 
 
@@ -180,3 +194,4 @@ Homeostasis-
 if __name__ == '__main__':
 
     createFigure1()
+    createFigure2()
