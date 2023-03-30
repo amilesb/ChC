@@ -177,6 +177,9 @@ class Processor:
                              height=ht, angle=angle)
             pShape.insert_Polygon(useVariableTargValue)
 
+        if not os.path.isdir('ChC_handles'):
+            os.makedirs(ChC_handles)
+
         if os.path.exists(f'ChC_handles/ChC_size_{array_size}'):
             with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
                 attachedChC = pickle.load(ChC_handle)
@@ -241,12 +244,12 @@ class Processor:
         return sdrFoundWholeFlag, targetIndxs
 
 
-    def applyReceptiveField(self, mode='Seek', refineTargs=None, numRefine=1):
+    def applyReceptiveField(self, mode='Seek', num=None):
         ''' Computes a 2D moving average to filter over input and extract
         selectNum number of target indices.
 
         Inputs:
-        mode           - String equal to 'Seek', 'Refine', or 'Infer'
+        mode           - String equal to 'Seek', or 'Infer'
         mask           - binary numpy array with which to threshold out
                          unwanted indices in order to refine a search
 
@@ -262,7 +265,8 @@ class Processor:
         # Process input with moving average filter; note, this is abstraction of
         # AIS and ChC weights bc arbitrarily selects out top 'num'!
         if mode=='Seek':
-            rawFilter = ndimage.uniform_filter(self.pShape.input_array, size=size,
+            size=np.random.randint(size)
+            rawFilter = ndimage.uniform_filter(self.pShape.input_array, size=3,
                                                mode='mirror')
             normWeighted = self.pShape.input_array-rawFilter
             num = self.selectNum()
@@ -271,28 +275,18 @@ class Processor:
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
         else:
+            # mode is 'Infer'
             weightsAIS = self.calcWeights()
-            step = self.pShape.input_array.MAX_INPUT/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+            step = self.pShape.input_array.max()/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
             weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
             weightsAdjusted[weightsAdjusted<0] = 0
             adjustedFilter = ndimage.uniform_filter(weightsAdjusted, size=size,
                                                     mode='mirror')
             normWeighted = weightsAdjusted-adjustedFilter
-
-        if mode=='Refine':
-            if refineTargs==None:
-                print('Failed to set target indices to refine in applyRF mode=Refine')
-            indxSort = np.c_[np.unravel_index(np.argsort(normWeighted.ravel())[::-1], normWeighted.shape)]
-            indxSort = [tuple(x) for x in indxSort.tolist()]
-            targetIndxs=[]
-            i=0
-            while len(targetIndxs) <= numRefine or i<normWeighted.size:
-                if indxSort[i] in refineTargs:
-                    targetIndxs.append(indxSort[i])
-                i += 1
-
-        elif mode=='Infer':
-            pass
+            if not num:
+                num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+            indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
+            targetIndxs = [tuple(x) for x in indxs.tolist()]
 
         return targetIndxs, False
 
@@ -340,9 +334,8 @@ class Processor:
         (applyReceptiveField).
 
         Inputs:
-        targetIndxs      - list of indices of input cells above the (direct
-                           AIS/ChC modulated) and (indirect dynamic -- meant to
-                           simulate AIS length changing) self.threshold
+        targetIndxs      - list of indices of input cells filtered as
+                           significantly above neighbors
 
         Returns:
         targetIndxs      - list of row, col indices for found targets
@@ -356,16 +349,19 @@ class Processor:
 
         self.targsINTERNAL.update(targetIndxs)
 
+        noiseEst = self.noiseEstimate(targetIndxs)
         for i in range(numSaccades):
             self.pShape.input_array = self.uncorruptedInput.copy()
             self.pShape.blur_Array(sigma=self.gaussBlurSigma)
             self.pShape.add_Noise(scale=self.noiseLevel)
             newIndxs, confidenceFlag = self.applyReceptiveField()
             self.targsINTERNAL.update(newIndxs)
+            noiseEst = (noiseEst + self.noiseEstimate(newIndxs))/(i+2)
 
         self.pShape.input_array = originalInput.copy() # restore input
 
         noiseFilter = numSaccades-self.countINTERNAL_MOVE
+        # noiseFilter = numSaccades-(numSaccades*(1-noiseEst))
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
@@ -386,28 +382,29 @@ class Processor:
                 return targetIndxs
 
 
-    # def noiseEstimate(self, targetIndxs):
-    #     '''Estimate noise from total value of targets found versus total
-    #     value found in input array.
-    #
-    #     Inputs:
-    #     targetIndxs     - list of indices of suspected targets
-    #
-    #     Returns:
-    #     noiseEst        - value equal to total value of targs / sum of input
-    #     '''
-    #
-    #     totalValOfTargsFound = 0
-    #     for i in targetIndxs:
-    #         totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
-    #     noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
-    #
-    #     return noiseEst
+    def noiseEstimate(self, targetIndxs):
+        '''Estimate noise from total value of targets found versus total
+        value found in input array.
+
+        Inputs:
+        targetIndxs     - list of indices of suspected targets
+
+        Returns:
+        noiseEst        - value equal to total value of targs / sum of input
+        '''
+
+        totalValOfTargsFound = 0
+        for i in targetIndxs:
+            totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
+        noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
+
+        return noiseEst
 
 
     # def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
     #     '''Helper function to remove suspected false targets from consideration.'''
-    #
+    #        Note this is a recursive function built on top of 2 nested recursive
+        functions (internalMove and applyReceptiveField)
     #     for falseTarg in suspectedFalseTargsDueToNoise:
     #         self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
 
@@ -440,9 +437,7 @@ class Processor:
 
 
     def externalMove(self, targetIndxs, allPrevTargIndxs=None):
-        '''External movement to simulate changing gradients across input space.
-        Note this is a recursive function built on top of 2 nested recursive
-        functions (internalMove and applyReceptiveField).
+        '''External movement to simulate changing gradients across input space..
 
         Inputs:
         targetIndxs       - list of indices of input cells above the (direct
@@ -491,7 +486,7 @@ class Processor:
                     self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
 
             newIndxs, confidenceFlag = self.applyReceptiveField()
-            newIndxs = self.internalMove(newIndxs, numSaccades=self.countEXTERNAL_MOVE+5)
+            newIndxs = self.internalMove(newIndxs)
             # self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             # self.countINTERNAL_MOVE = 0
 
@@ -616,9 +611,16 @@ class Processor:
         None                - function creates or updates existing object
         '''
 
+        DIR1 = 'ChC_handles/Objects'
+        DIR2 = 'ChC_handles/Targs'
+
+        if not os.path.isdir(DIR1):
+            os.makedirs(DIR1)
+        if not os.path.isdir(DIR2):
+            os.makedirs(DIR2)
+
         if not sdrName:
-            DIR = 'ChC_handles/Objects'
-            sdrName = len([name for name in os.listdir(DIR) if os.path.isfile(os.path.join(DIR, name))])
+            sdrName = len([name for name in os.listdir(DIR1) if os.path.isfile(os.path.join(DIR1, name))])
             # Save target index list as set
             with open(f'ChC_handles/Targs/targs_{sdrName}', 'wb') as targs_handle:
                 pickle.dump(self.trueTargs, targs_handle)

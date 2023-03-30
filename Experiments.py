@@ -11,12 +11,10 @@ from Processor import Processor
 
 def createFigure1():
 
-    applyRF = []
-    internal = []
-    external = []
     applyRF_N = []
     internalN = []
     externalN = []
+    noiseAdded = []
 
     standardizedInputs = dict(array_size=32, numTargets=20,
                               useTargetSubclass=True, maxInput=255,
@@ -33,26 +31,43 @@ def createFigure1():
 
         # Setup - with noise and blurring but no gradient
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=i/2,
-                            noiseLevel=i/2, display=False, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=0.01*i,
+                            noiseLevel=0.01*i, display=False, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))
-        sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR()
+        sdrFoundWholeFlag, targetIndxs = P_Noise.extractSDR(plot=False)
         P_Noise.updateChCWeightsMatchedToSDR(targetIndxs)
         applyRF_N.append(P_Noise.countAPPLY_RF)
         internalN.append(P_Noise.countINTERNAL_MOVE)
         # internalN.append(P_Noise.internalMovesCounter)
         externalN.append(P_Noise.countEXTERNAL_MOVE)
+        noiseAdded.append(i)
 
         end = time.time()
-        print(f'time for noise with standard deviation equal to {i/2} added: {end-start:.1f}s')
+        print(f'time for noise with standard deviation equal to {0.05*i} added: {end-start:.1f}s')
 
 
-##### figure out why second display is happening!!
-    # fig, ax = plt.subplots(figsize=(10, 10))
-    # ax.hist(internal)
-    # ax.hist(external)
+#### NOTE applyRF, Internal, and external are effectively all the same plot!
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 3, 1)
+    ax2 = fig.add_subplot(1, 3, 2)
+    ax3 = fig.add_subplot(1, 3, 3)
+    ax1.plot(noiseAdded, applyRF_N, label='ApplyRF')
+    ax2.plot(noiseAdded, internalN, label='Internal Movement')
+    ax3.plot(noiseAdded, externalN, label='External Movement')
+    ax1.set_title('ApplyRF')
+    ax1.set_xlabel('Noise')
+    ax1.set_ylabel('Number')
+    ax2.set_title('Internal')
+    ax2.set_xlabel('Noise')
+    ax2.set_ylabel('Number')
+    ax3.set_title('External')
+    ax3.set_xlabel('Noise')
+    ax3.set_ylabel('Number')
+
+    plt.show()
+
 
     print('applyRF', applyRF_N)
     print('internal', internalN)
@@ -61,6 +76,11 @@ def createFigure1():
 
 
 ############## EXPERIMENT 2 #####################
+'''Once objects learned; found faster with weights set'''
+
+
+
+############# EXPERIMENT 3 ######################
 
 
 
@@ -74,7 +94,7 @@ Weights get stored; a new object is learned
 new objects keep getting added until threshold of collision with other objects
 is reached.
 
-At this point,network can tighten sparisty to increase stored items OR change
+At this point,network can tighten sparsity to increase stored items OR change
 number of active targets in each object to move towards average value i.e. targ
 with 8 gains new input connections to generate more and targ with 40 loses some.
 '''
