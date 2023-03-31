@@ -179,13 +179,10 @@ L6
 desired with varying levels of noise sparsity (plot # applyRF, externalMove, and
 refineSDR for various noise parameters)
 
-Figure 2 = create objects with varying # of targets 1-1024 show that network
-can store maximal representations with sparsity in range of 20-40
-note, if pattens drawn from random distribution improves robustness i.e. less
-chance collision but if 20 activate pattern a and 19same 1 new activates z
-instead of b then durning inference rearrange
+figure 2 = Once objects learned; found faster with weights set
 
-figure 3 = Once objects learned; found faster with weights set
+Figure 3 = Feed into spatial pooler 1000 sdrs; show that random activation
+represents x% sdrA, y% sdrB, etc...
 
 figure 4 = information is abstracted; weight combos enable dynamic selection
 i.e. hierarchical layer recieving inputs as lower level ChC weight SDRs then
@@ -209,6 +206,13 @@ Add noise repeat fig 6?
 
 fig ?
 Try MNIST with uncorrupted / corrupted cells see if it can identify how many objects to create?
+
+Figure XXX = create objects with varying # of targets 1-1024 show that network
+can store maximal representations with sparsity in range of 20-40
+note, if pattens drawn from random distribution improves robustness i.e. less
+chance collision but if 20 activate pattern a and 19same 1 new activates z
+instead of b then durning inference rearrange
+
 
 Couple figs main theory
 
