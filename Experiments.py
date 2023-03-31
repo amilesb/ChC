@@ -21,7 +21,7 @@ def createFigure1():
                               useTargetSubclass=True, maxInput=255,
                               useVariableTargValue=True)
 
-    for i in range(10):
+    for i in range(2):
         start = time.time()
 
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
@@ -84,15 +84,60 @@ def createFigure2():
         for f in os.listdir(DIR2):
             os.remove(os.path.join(DIR2, f))
 
-    # # Simple setup - no noise, blurring, or gradient
-    # inputs = dict(array_size=32, numTargets=20, useTargetSubclass=True,
-    #               maxInput=255, useVariableTargValue=False)
-    # for i in range(1000):
-    #     pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
-    #     P = Processor('Exact', sparseHigh=20, pShape=pShape, attachedChC=attachedChC)
-    #     sdrFoundWholeFlag, targetIndxs = P.extractSDR()
-    #     internal.append(P.countINTERNAL_MOVE)
-    #     external.append(P.countEXTERNAL_MOVE)
+    # Simple setup - no noise, blurring, or gradient
+
+    inputs = dict(array_size=32, numTargets=20, useTargetSubclass=True,
+                  maxInput=255, useVariableTargValue=True)
+    P_Objs = []
+    for i in range(5):
+        pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
+        P = Processor('Exact', sparseHigh=20, gaussBlurSigma=5,
+                      noiseLevel=5, display=False, pShape=pShape,
+                      attachedChC=attachedChC
+                     )
+        P_Objs.append(P)
+
+    results_AvgApplyRF = []
+    for i in range(2):
+        applyRF_Global = []
+        for P in P_Objs:
+            applyRF_Local = []
+            for j in range(10):
+                if i == 1:
+                    P.noiseLevel += 1
+                    P.gaussBlurSigma += 1
+                sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
+                P.updateChCWeightsMatchedToSDR(targetIndxs)
+                applyRF_Local.append(P.countAPPLY_RF)
+                P.countAPPLY_RF = 0
+            applyRF_Global.append(applyRF_Local)
+
+        arrays = [np.array(x) for x in applyRF_Global]
+        avgApplyRF = [np.mean(k) for k in zip(*arrays)]
+        results_AvgApplyRF.append(avgApplyRF)
+
+    # applyRF_GlobalN = []
+    # for P in P_Objs:
+    #     applyRF_LocalN = []
+    #     for i in range(10):
+    #         P.noiseLevel += 1
+    #         P.gaussBlurSigma += 1
+    #         sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
+    #         P.updateChCWeightsMatchedToSDR(targetIndxs)
+    #         applyRF_LocalN.append(P.countAPPLY_RF)
+    #         P.countAPPLY_RF = 0
+    #     applyRF_GlobalN.append(applyRF_LocalN)
+    #
+    # arraysN = [np.array(x) for x in applyRF_GlobalN]
+    # avgApplyRF_N = [np.mean(k) for k in zip(*arraysN)]
+
+    plt.plot(results_AvgApplyRF[0])
+    plt.plot(results_AvgApplyRF[1])
+    plt.title('Average Number of Iterative Steps to Find SDR')
+    plt.xlabel('Training Number')
+    plt.ylabel('Number of Iterations')
+
+    plt.show()
 
 ############# FIGURE 3 ######################
 

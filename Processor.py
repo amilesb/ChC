@@ -214,12 +214,12 @@ class Processor:
 
         targetIndxs, confidenceFlag = self.applyReceptiveField()
 
-        print('finished applyRF', sorted(targetIndxs))
+        # print('finished applyRF', sorted(targetIndxs))
         targetIndxs = self.internalMove(targetIndxs)
-        print('finished internalMove', targetIndxs)
+        # print('finished internalMove', targetIndxs)
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
-        print('finished externalMove', targetIndxs)
+        # print('finished externalMove', targetIndxs)
 
         if plot:
             self.displayInputSearch(plotTitle='From externalMove Target Indices')
@@ -239,7 +239,6 @@ class Processor:
         #     self.trainTopo()
 # during learning extract --> refine --> sdr acquired store in chc weights
 ### during inference extract SDR with applyRF mode = inference, if match success use if not enter learning mode
-
 
         return sdrFoundWholeFlag, targetIndxs
 
