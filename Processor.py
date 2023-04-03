@@ -194,7 +194,7 @@ class Processor:
         return pShape, attachedChC
 
 
-    def extractSDR(self, plot=True):
+    def extractSDR(self, plot=True, mode='Seek'):
         '''High level function to control process flow and extract an SDR from
         an input.
 
@@ -212,10 +212,10 @@ class Processor:
                            indicating ambiguity.
         '''
 
-        targetIndxs, confidenceFlag = self.applyReceptiveField()
+        targetIndxs, confidenceFlag = self.applyReceptiveField(mode=mode)
 
         # print('finished applyRF', sorted(targetIndxs))
-        targetIndxs = self.internalMove(targetIndxs)
+        targetIndxs = self.internalMove(targetIndxs, mode=mode)
         # print('finished internalMove', targetIndxs)
 
         sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
