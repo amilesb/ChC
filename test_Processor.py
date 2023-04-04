@@ -133,6 +133,11 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.internalNoiseFlag == True
 
 
+    def test_noiseEstimate(self):
+        print('need to implement test_noiseEstimate')
+        pass
+
+
     def test_selectFromMostCommon(self):
         self.processor.targsINTERNAL = Counter('abcde')
         targetIndxs = self.processor.selectFromMostCommon(10)
@@ -208,8 +213,15 @@ class TestProcessor(unittest.TestCase):
         pass
 
 
+    def test_findNamesForMatchingSDRs(self):
+        indxs = [(i, i) for i in range(10)]
+        knownSDRs = []
+        for j in range(10):
+            knownSDRs.append([(j+k, j+k) for k in range(10)])
 
+        overlap = self.processor.findNamesForMatchingSDRs(indxs, knownSDRs)
 
+        assert overlap == [0, 1, 2]
 
 
 if __name__ == '__main__':

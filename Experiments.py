@@ -116,21 +116,6 @@ def createFigure2():
         avgApplyRF = [np.mean(k) for k in zip(*arrays)]
         results_AvgApplyRF.append(avgApplyRF)
 
-    # applyRF_GlobalN = []
-    # for P in P_Objs:
-    #     applyRF_LocalN = []
-    #     for i in range(10):
-    #         P.noiseLevel += 1
-    #         P.gaussBlurSigma += 1
-    #         sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
-    #         P.updateChCWeightsMatchedToSDR(targetIndxs)
-    #         applyRF_LocalN.append(P.countAPPLY_RF)
-    #         P.countAPPLY_RF = 0
-    #     applyRF_GlobalN.append(applyRF_LocalN)
-    #
-    # arraysN = [np.array(x) for x in applyRF_GlobalN]
-    # avgApplyRF_N = [np.mean(k) for k in zip(*arraysN)]
-
     plt.plot(results_AvgApplyRF[0])
     plt.plot(results_AvgApplyRF[1])
     plt.title('Average Number of Iterative Steps to Find SDR')
@@ -141,6 +126,39 @@ def createFigure2():
 
 ############# FIGURE 3 ######################
 
+def createFigure3():
+
+    # Setup
+    P_Objs = []
+    knownSDRs = []
+    for i in range(1000):
+        num = np.random.randint(20, 41)
+        inputs = dict(array_size=32, numTargets=num, useTargetSubclass=True,
+                      maxInput=255, useVariableTargValue=False)
+        pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
+        P = Processor('Exact', sparseHigh=num, gaussBlurSigma=0,
+                      noiseLevel=0, display=False, pShape=pShape,
+                      attachedChC=attachedChC
+                     )
+        knownSDRs.append(P.pShape.activeElements))
+        for j in range(10):
+            sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
+            P.updateChCWeightsMatchedToSDR(targetIndxs)
+        P_Objs.append(P)
+
+
+    min=0
+    max=255
+    targBoost=10
+    for i in range(100):
+        P = np.random.choice(P_Objs)
+        indexSDR = P.pShape.activeElements
+        len = P.pShape.input_array.shape[0]
+        randInput = np.random.randint(min, max, size=(len, len))
+        for idx in indexSDR:
+            randInput[idx] = min(randInput[idx]+targBoost, max)
+        targetIndxs, _ = P.applyReceptiveField(mode='Seek')
+        P.setChCWeightsFromSDR(targetIndxs, knownSDRs)
 
 
 '''learning a new object consists of activating more and more units until object

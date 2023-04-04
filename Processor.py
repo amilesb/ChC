@@ -403,7 +403,7 @@ class Processor:
     # def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
     #     '''Helper function to remove suspected false targets from consideration.'''
     #        Note this is a recursive function built on top of 2 nested recursive
-        functions (internalMove and applyReceptiveField)
+        # functions (internalMove and applyReceptiveField)
     #     for falseTarg in suspectedFalseTargsDueToNoise:
     #         self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
 
@@ -686,6 +686,30 @@ class Processor:
 
         # key concept in wilcoxon rank sum test uValue ranges from 0 (= complete sepatation) to n1*n2 (= no separation) where n1 and n2 are number of samples from each distribution (here size of receptive field).  Note, bc of the threshold splitting above and below the uValue will be zero.  The pValue though tells the probability that this is true.
         return min(1/pValue, self.maxFiringRateOutput)
+
+
+    def findNamesForMatchingSDRs(self, indxs, knownSDRs, threshold=8):
+        '''Accepts a list of indices and identifies any SDRs that match above a
+        threshold and collects the ChC weights attached to each of those.  Uses
+        these matches to compute overlap.
+
+        Inputs:
+        indxs       - list of indices that were selected from the input
+        knownSDRs   - list of individual lists of previously identified SDRs
+                      indices
+
+        Returns:
+        overlap     - list of names for all matching SDRs above the threshold
+        '''
+
+        indxs = set(indxs)
+        overlap = []
+        for count, SDR in enumerate(knownSDRs):
+            match = indxs & set(SDR)
+            if len(match) >= 8:
+                overlap.append(count)
+
+        return overlap
 
 
     def displayInputSearch(self, plotTitle='Target Indices'):
