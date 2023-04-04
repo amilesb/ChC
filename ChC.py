@@ -131,7 +131,7 @@ class ChC:
         return sum([list(chc.values())[0] for chc in self.PyC[PyC_array_element]])
 
 
-    def total_Active_Weight(self, PyC_array_element, avgPercentFR_RF):
+    def total_Active_Weight(self, PyC_array_element, avgPercentFR_RF=1):
         '''Takes a point in the PyC input space as a tuple and average percent
         firing rate within the receptive field being anayzed and returns the
         total active synapse weight attached to that input cell.'''
@@ -372,9 +372,13 @@ class AIS:
         self.ais = np.zeros(shape = (Polygon_Array.input_array.shape[0],
                                     Polygon_Array.input_array.shape[1]))
         self.MAX = ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
+        self.reset(AIS)
+
+    def resetAIS(self):
+        # naively set AIS to midway point
         for i in range(self.ais.shape[0]):
             for j in range(self.ais.shape[1]):
-                self.ais[i, j] = self.MAX/2 # naively set AIS to midway point
+                self.ais[i, j] = self.MAX/2
 
     def moveAIS(self, idx):
         '''Accept an index and move AIS up or down to assist in improving
