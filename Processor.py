@@ -632,13 +632,13 @@ class Processor:
             dist = self.computeMinDist(indx, refinedTargIndxs)
             if dist==0:
                 self.attachedChC.change_Synapse_Weight(connection, change=-3)
-            elif dist <1.5:
+            elif dist < 1.5:
                 self.attachedChC.change_Synapse_Weight(connection, change=-2)
-            elif dist <2.5:
+            elif dist < 2.5:
                 self.attachedChC.change_Synapse_Weight(connection, change=-1)
-            elif 5.5 > dist >= 3.5:
+            elif 4.5 > dist >= 3.5:
                 self.attachedChC.change_Synapse_Weight(connection, change=1)
-            elif 7.5 > dist >= 3.5:
+            elif 6.5 > dist >= 4.5:
                 self.attachedChC.change_Synapse_Weight(connection, change=2)
             else:
                 self.attachedChC.change_Synapse_Weight(connection, change=3)
