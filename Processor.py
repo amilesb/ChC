@@ -273,6 +273,7 @@ class Processor:
                 num = self.pShape.input_array.size
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
+            sdrFoundWholeFlag=False
         else:
             # mode is 'Infer'
             weightsAIS = self.calcWeights()
@@ -286,8 +287,9 @@ class Processor:
                 num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
+            sdrFoundWholeFlag=True
 
-        return targetIndxs, False
+        return targetIndxs, sdrFoundWholeFlag
 
 
     def calcWeights(self, RF_AvgToMax=1):
