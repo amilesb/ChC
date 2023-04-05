@@ -352,17 +352,25 @@ class Processor:
 
         noiseEst = self.noiseEstimate(targetIndxs)
         for i in range(numSaccades):
-            self.pShape.input_array = self.uncorruptedInput.copy()
-            self.pShape.blur_Array(sigma=self.gaussBlurSigma)
-            self.pShape.add_Noise(scale=self.noiseLevel)
-            newIndxs, confidenceFlag = self.applyReceptiveField()
+            self.pShape.input_array = originalInput.copy()
+            if mode=='Seek':
+                sigma = self.gaussBlurSigma
+                scale = self.noiseLevel
+            else:
+                sigma = noiseEst
+                scale = noiseEst
+            self.pShape.blur_Array(sigma=sigma)
+            self.pShape.add_Noise(scale=scale)
+            newIndxs, confidenceFlag = self.applyReceptiveField(mode)
             self.targsINTERNAL.update(newIndxs)
             noiseEst = (noiseEst + self.noiseEstimate(newIndxs))/(i+2)
 
         self.pShape.input_array = originalInput.copy() # restore input
 
-        noiseFilter = numSaccades-self.countINTERNAL_MOVE
-        # noiseFilter = numSaccades-(numSaccades*(1-noiseEst))
+        if mode=='Seek':
+            noiseFilter = max(numSaccades-self.countINTERNAL_MOVE, 1)
+        else:
+            noiseFilter = numSaccades-(numSaccades*(1-noiseEst))
 
         suspectedFalseTargsDueToNoise = []
         targetIndxs = []
