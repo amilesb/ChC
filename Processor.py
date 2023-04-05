@@ -712,6 +712,44 @@ class Processor:
         return overlap
 
 
+    def setChCWeightsFromMatchedSDRs(self, sdr_names):
+        '''Accepts a list of indices and identifies any SDRs that match above a
+        threshold and collects the ChC weights attached to each of those.  Uses
+        these matches to compute overlap.
+
+        Inputs:
+        sdr_names   - list of sdr names
+
+
+        Returns:
+        compositeChC  - weights for a composite set of attached ChCs based on all
+                        sdrs in list provided
+        '''
+
+        connected = []
+        for sdrName in sdr_names:
+            with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
+                attachedChC = pickle.load(ChC_handle)
+            connected.append(attachedChC)
+
+
+        if len(sdr_names) == 0:
+            array_size = P.pShape.input_array.shape[0]
+            with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
+                self.attachedChC = pickle.load(ChC_handle)
+        else:
+            for indx in self.attachedChC.PyC_points:
+                w = []
+                for attached in connected:
+                    w.append(attached.total_Active_Weight(PyC_array_element=indx))
+                    avg_intW = np.round(sum(w)/len(w))
+                connection = indx, self.attachedChC.PyC[indx]
+                self.attachedChC.change_Synapse_Weight(connection=connection,
+                                                       change='SET',
+                                                       target_tot_wght=avg_intW)
+
+
+
     def displayInputSearch(self, plotTitle='Target Indices'):
 
         targsNotFoundYet = list(set(self.pShape.activeElements) - set(self.correctTargsFound))

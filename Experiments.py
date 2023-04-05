@@ -158,7 +158,11 @@ def createFigure3():
         for idx in indexSDR:
             randInput[idx] = min(randInput[idx]+targBoost, max)
         targetIndxs, _ = P.applyReceptiveField(mode='Seek')
-        P.setChCWeightsFromSDR(targetIndxs, knownSDRs)
+        overlap = P.findNamesForMatchingSDRs(targetIndxs, knownSDRs)
+        P.AIS.resetAIS()
+        P.setChCWeightsFromMatchedSDRs(overlap)
+        sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False, mode='Infer')
+
 
 
 '''learning a new object consists of activating more and more units until object
