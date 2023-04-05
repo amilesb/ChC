@@ -372,7 +372,7 @@ class AIS:
         self.ais = np.zeros(shape = (Polygon_Array.input_array.shape[0],
                                     Polygon_Array.input_array.shape[1]))
         self.MAX = ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        self.reset(AIS)
+        self.resetAIS()
 
     def resetAIS(self):
         # naively set AIS to midway point
