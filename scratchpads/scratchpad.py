@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 from collections import Counter
 from scipy.ndimage.filters import gaussian_filter
+from scipy import stats, ndimage
 
 
 class Scratchpad():
@@ -101,6 +102,56 @@ class Scratchpad():
         self.recrusiveCounter(i)
 
 
+    def filtering(self):
+        test = np.arange(100.00).reshape(10,10)
+        print(test)
+        mask = np.zeros((10, 10))
+        mask[1,3] = 1
+        mask[4,5] = 1
+        mask[4,6] = 1
+        mask[4,7] = 1
+        mask[4,8] = 1
+        mask[5,6] = 1
+        mask[5,7] = 1
+        mask[5,8] = 1
+        mask[5,9] = 1
+        mask[6,7] = 1
+        test[1,3] = .01
+        print('m',mask)
+        result = test*mask
+        print('result', result)
+        thresholdedFilter = ndimage.uniform_filter(result, size=100)
+        print('Threshold')
+        print(thresholdedFilter)
+        normWeighted = result-thresholdedFilter
+        print('Normed')
+        print(normWeighted)
+        indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-10)[-10:], normWeighted.shape)]
+        print('indxs', indxs)
+
+applyRFFFFFF
+    elif mode=='Refine':
+        if refineTargs==None:
+            print('Failed to set target indices to refine in applyRF mode=Refine')
+        # bin = np.zeros([self.pShape.input_array.shape[0], self.pShape.input_array.shape[1]])
+        # for idx in targs:
+        #     bin[idx[0], idx[1]] = 1
+        # numTargsToRefine = np.sum(bin)
+        # num = np.round(numTargsToRefine*(1-PERCENT_REFINE))
+        #
+        # thresholded = self.pShape.input_array.copy()*bin
+        # thresholdedFilter = ndimage.uniform_filter(thresholded, size=size,
+        #                                            mode='mirror')
+        # normWeighted = thresholded-thresholdedFilter
+        indxSort = np.c_[np.unravel_index(np.sort(normWeighted.ravel()), normWeighted.shape)]
+        targetIndxs=[]
+        i=0
+        while len(targetIndxs) < numRefine or i<normWeighted.size:
+            if indxSort[i] in refineTargs:
+                targetIndxs.append(indxSort[i])
+            i += 1
+
+
 if __name__ == '__main__':
 
     scratch = Scratchpad()
@@ -108,5 +159,6 @@ if __name__ == '__main__':
     # scratch.argpart()
     # scratch.gauss_blur()
     # scratch.commonPick()
-    scratch.recrusiveCounter(0)
-    print('after recursive function exit', scratch.counterTest)
+    # scratch.recrusiveCounter(0)
+    # print('after recursive function exit', scratch.counterTest)
+    scratch.filtering()
