@@ -224,6 +224,11 @@ class TestProcessor(unittest.TestCase):
         assert overlap == [0, 1, 2]
 
 
+    def test_setChCWeightsFromMatchedSDRs(self):
+        print('need to implement test setChCWeightsFromMatchedSDRs')
+        pass       
+
+
 if __name__ == '__main__':
     unittest.main()
 

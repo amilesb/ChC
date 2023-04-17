@@ -21,12 +21,12 @@ def createFigure1():
                               useTargetSubclass=True, maxInput=255,
                               useVariableTargValue=True)
 
-    for i in range(2):
+    for i in range(2): #100
         start = time.time()
 
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**standardizedInputs)
-        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=0.01*i,
-                            noiseLevel=0.01*i, display=False, pShape=pShape,
+        P_Noise = Processor('Exact', sparseHigh=20, gaussBlurSigma=0.1*i,
+                            noiseLevel=0.1*i, display=False, pShape=pShape,
                             attachedChC=attachedChC
                             )
         print('True Targets', sorted(pShape.activeElements))
@@ -89,7 +89,7 @@ def createFigure2():
     inputs = dict(array_size=32, numTargets=20, useTargetSubclass=True,
                   maxInput=255, useVariableTargValue=True)
     P_Objs = []
-    for i in range(5):
+    for i in range(5): # 25
         pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
         P = Processor('Exact', sparseHigh=20, gaussBlurSigma=5,
                       noiseLevel=5, display=False, pShape=pShape,
@@ -98,11 +98,11 @@ def createFigure2():
         P_Objs.append(P)
 
     results_AvgApplyRF = []
-    for i in range(2):
+    for i in range(2): # 10
         applyRF_Global = []
         for P in P_Objs:
             applyRF_Local = []
-            for j in range(10):
+            for j in range(10): # 20
                 if i == 1:
                     P.noiseLevel += 1
                     P.gaussBlurSigma += 1
@@ -140,7 +140,7 @@ def createFigure3():
                       noiseLevel=0, display=False, pShape=pShape,
                       attachedChC=attachedChC
                      )
-        knownSDRs.append(P.pShape.activeElements))
+        knownSDRs.append(P.pShape.activeElements)
         for j in range(10):
             sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
             P.updateChCWeightsMatchedToSDR(targetIndxs)
@@ -149,14 +149,16 @@ def createFigure3():
 
     min=0
     max=255
-    targBoost=10
+    targBoost=100
     for i in range(100):
         P = np.random.choice(P_Objs)
+        P.knownSDRs = knownSDRs
         indexSDR = P.pShape.activeElements
         len = P.pShape.input_array.shape[0]
         randInput = np.random.randint(min, max, size=(len, len))
         for idx in indexSDR:
             randInput[idx] = min(randInput[idx]+targBoost, max)
+        P.pShape.input_array = randInput
         targetIndxs, _ = P.applyReceptiveField(mode='Seek')
         overlap = P.findNamesForMatchingSDRs(targetIndxs, knownSDRs)
         P.AIS.resetAIS()
