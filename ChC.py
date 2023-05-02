@@ -19,9 +19,7 @@ class ChC:
 
     def __repr__(self):
         self.sort_PyC()
-        return (f'''This class returns a dictionary which maps chandelier
-                    cells to elements in an array.\n  Array elements with
-                    ChC attached and weights\n{self.PyC}''')
+        return (f'''This class returns a dictionary which maps chandelier cells to elements in an array.\n  Array elements with ChC attached and weights\n{self.PyC}''')
 
 
 
