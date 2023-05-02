@@ -18,8 +18,11 @@ class ChC:
     those connections'''
 
     def __repr__(self):
-        return (f'''This class returns a dictionary which maps chandelier cells
-                    to elements in an array.''')
+        self.sort_PyC()
+        return (f'''This class returns a dictionary which maps chandelier
+                    cells to elements in an array.\n  Array elements with
+                    ChC attached and weights\n{self.PyC}''')
+
 
 
     def __init__(self, Polygon_Array):
