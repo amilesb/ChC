@@ -218,7 +218,8 @@ class Processor:
         targetIndxs = self.internalMove(targetIndxs, mode=mode)
         # print('finished internalMove', targetIndxs)
 
-        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+        if mode == 'Seek':
+            sdrFoundWholeFlag, targetIndxs = self.externalMoveSEEK(targetIndxs)
         # print('finished externalMove', targetIndxs)
 
         if plot:
@@ -361,22 +362,25 @@ class Processor:
             saccadeNum += 1
             self.pShape.input_array = originalInput.copy() # restore input
             noiseEst.append(self.noiseEstimate(targetIndxs))
+            noise = sum(noiseEst)/len(noiseEst)
             if mode=='Seek':
                 sigma = self.gaussBlurSigma
                 scale = self.noiseLevel
+                noiseFilter = min(saccadeNum-(saccadeNum*(1-noise)), 2)
             else:
                 sigma = scale = sum(noiseEst)/len(noiseEst)
+                noiseFilter = max(saccadeNum-(saccadeNum*(1-noise)), 2)
             self.pShape.blur_Array(sigma=sigma)
             self.pShape.add_Noise(scale=scale)
             newIndxs, confidenceFlag = self.applyReceptiveField(mode=mode, num=num)
             self.targsINTERNAL.update(newIndxs)
 
             if saccadeNum > minSaccades:
-                noise = sum(noiseEst)/len(noiseEst)
-                if mode=='Seek':
-                    noiseFilter = min(saccadeNum-(saccadeNum*(1-noise)), 2)
-                else:
-                    noiseFilter = max(saccadeNum-(saccadeNum*(1-noise)), 2)
+                # noise = sum(noiseEst)/len(noiseEst)
+                # if mode=='Seek':
+                #     noiseFilter = min(saccadeNum-(saccadeNum*(1-noise)), 2)
+                # else:
+                #     noiseFilter = max(saccadeNum-(saccadeNum*(1-noise)), 2)
                 suspectedFalseTargsDueToNoise = []
                 targetIndxs = []
                 for targ in self.targsINTERNAL:
@@ -393,8 +397,12 @@ class Processor:
             else: # mode is 'inference'
                 if self.sparseNum['high'] < len(targetIndxs):
                     targetIndxs = [i[0] for i in self.targsINTERNAL.most_common(self.sparseNum['high'])]
-                if self.sparseNum['low'] <= len(targetIndxs) <= self.sparseNum['low']:
-                    self.internalNoiseFlag = False
+                if self.sparseNum['low'] <= len(targetIndxs):
+                    try:
+                        if flag:
+                            self.internalNoiseFlag = True
+                    except:
+                        self.internalNoiseFlag = False
                     KeepGoing=False
                 else:
                     if num:
@@ -402,6 +410,7 @@ class Processor:
                         num = min(self.pShape.input_array.size, num)
                     else:
                         num = self.sparseNum['high']
+                    flag = True
                     newIndxs, confidenceFlag = self.applyReceptiveField(mode=mode, num=num)
 
         return targetIndxs
@@ -459,66 +468,68 @@ class Processor:
         return targetIndxs
 
 
-    # def externalMove(self, targetIndxs, mode='Seek'):   SEEEKER!!!!!!!!!!!
-    #     '''External movement to simulate changing gradients across input space..
-    #
-    #     Inputs:
-    #     targetIndxs       - list of indices of input cells above the (direct
-    #                         AIS/ChC modulated) and (indirect dynamic -- meant to
-    #                         simulate AIS length changing) self.threshold
-    #
-    #     Returns:
-    #     sdrFoundWholeFlag - Boolean indicating that if true then indexes
-    #                         corresponding to SDR match the lower bound of ground
-    #                         truth indices.  If false, targetIndxs will be
-    #                         incomplete i.e. less than sparse lower bound
-    #                         indicating ambiguity.
-    #     suspectedTargs    - list of row, col indices for found targets
-    #     '''
-    #
-    #     originalInput = self.pShape.input_array.copy()
-    #     keepGoing = True
-    #     allPrevTargIndxs=[]
-    #
-    #     while keepGoing:
-    #         suspectedTargs = set(targ for targ in targetIndxs)|allPrevTargIndxs
-    #         correctTargs = suspectedTargs & self.trueTargs
-    #         incorrect = suspectedTargs - self.trueTargs
-    #
-    #         self.correctTargsFound.update(correctTargs)
-    #         self.falseTargsFound.update(incorrect)
-    #
-    #         # For debugging and visulization
-    #         # self.displayInputSearch(self, plotTitle='from internalMove Target Indices')                             )
-    #
-    #         if len(correctTargs) >= self.sparseNum['low']:
-    #             if len(suspectedTargs) > self.sparseNum['high']:
-    #                 return False, list(suspectedTargs)
-    #             else:
-    #                 return True, list(suspectedTargs)
-    #
-    #         self.simulateExternalMove(self.noiseLevel)
-    #         self.countEXTERNAL_MOVE += 1
-    #
-    #         # Move AIS on suspected targs to bias network to look for new suspects
-    #         for indx in self.attachedChC.PyC_points:
-    #             if indx in suspectedTargs:
-    #                 self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-1) # Move AIS farther from cell body
-    #             else:
-    #                 self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
-    #
-    #         newIndxs, confidenceFlag = self.applyReceptiveField()
-    #         newIndxs = self.internalMove(newIndxs)
-    #         # self.internalMovesCounter.append(self.countINTERNAL_MOVE)
-    #         # self.countINTERNAL_MOVE = 0
-    #
-    #         self.pShape.input_array = originalInput.copy()
-    #
-    #         return self.externalMove(targetIndxs=newIndxs,
-    #                                  allPrevTargIndxs=suspectedTargs)
+    def externalMoveSEEK(self, targetIndxs, allPrevTargIndxs=None, mode='Seek'):
+        '''External movement to simulate changing gradients across input space..
+
+        Inputs:
+        targetIndxs       - list of indices of input cells above the (direct
+                            AIS/ChC modulated) and (indirect dynamic -- meant to
+                            simulate AIS length changing) self.threshold
+
+        Returns:
+        sdrFoundWholeFlag - Boolean indicating that if true then indexes
+                            corresponding to SDR match the lower bound of ground
+                            truth indices.  If false, targetIndxs will be
+                            incomplete i.e. less than sparse lower bound
+                            indicating ambiguity.
+        suspectedTargs    - list of row, col indices for found targets
+        '''
+
+        originalInput = self.pShape.input_array.copy()
+        keepGoing = True
+
+        while keepGoing:
+            if allPrevTargIndxs:
+                suspectedTargs = set(targ for targ in targetIndxs)|allPrevTargIndxs
+            else:
+                suspectedTargs = set(targ for targ in targetIndxs)
+            correctTargs = suspectedTargs & self.trueTargs
+            incorrect = suspectedTargs - self.trueTargs
+
+            self.correctTargsFound.update(correctTargs)
+            self.falseTargsFound.update(incorrect)
+
+            # For debugging and visulization
+            # self.displayInputSearch(self, plotTitle='from internalMove Target Indices')                             )
+
+            if len(correctTargs) >= self.sparseNum['low']:
+                if len(suspectedTargs) > self.sparseNum['high']:
+                    return False, list(suspectedTargs)
+                else:
+                    return True, list(suspectedTargs)
+
+            self.simulateExternalMove(self.noiseLevel)
+            self.countEXTERNAL_MOVE += 1
+
+            # Move AIS on suspected targs to bias network to look for new suspects
+            for indx in self.attachedChC.PyC_points:
+                if indx in suspectedTargs:
+                    self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-1) # Move AIS farther from cell body
+                else:
+                    self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
+
+            newIndxs, confidenceFlag = self.applyReceptiveField()
+            newIndxs = self.internalMove(newIndxs)
+            # self.internalMovesCounter.append(self.countINTERNAL_MOVE)
+            # self.countINTERNAL_MOVE = 0
+
+            self.pShape.input_array = originalInput.copy()
+
+            return self.externalMoveSEEK(targetIndxs=newIndxs,
+                                         allPrevTargIndxs=suspectedTargs)
 
 
-    def externalMove(self, targetIndxs, mode='Inference'):
+    def externalMoveINFER(self, targetIndxs, mode='Inference'):
         '''External movement to simulate changing gradients across input space..
 
         Inputs:
@@ -563,7 +574,7 @@ class Processor:
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0
             newIndxs = self.internalMove(newIndxs, mode='Infer')
-            overlap = P.findNamesForMatchingSDRs(newIndxs)
+            overlap = self.findNamesForMatchingSDRs(newIndxs)
             P.setChCWeightsFromMatchedSDRs(overlap)
 
 
@@ -572,6 +583,7 @@ class Processor:
             return self.externalMove(targetIndxs=newIndxs,
                                      allPrevTargIndxs=suspectedTargs)
 
+        #############3333 use dynamic feedback from interference based firing rate to AIS change in external move!!!!!
 
 
     # def externalMove(self, targetIndxs, allPrevTargIndxs=None):
@@ -808,11 +820,16 @@ class Processor:
                               indices in receptive field sub-arrays
 
         Returns:
-        outputFR      - Scalar value representing strength of target indexes
-                        found.
+        targOutputStrengths  - dictionary with keys equal to target indices and
+                               values equal to interference strength (output
+                               firing rate).
         '''
 
+        # Set up variables
         arr = self.pShape.input_array
+        intTargIndxs = {}
+        for targ in targetIndxs:
+            intTargIndxs[targ] = int(f'{targ[0]}{targ[1]}')
 
         highVal = max(len(targetIndxs), self.sparseNum['high']+1)
         numRF=np.random.randint(self.sparseNum['low'], highVal)
@@ -821,44 +838,33 @@ class Processor:
         # Split array into smaller receptive fields
         arrIndx = np.arange(arr.size)
         arrIndx = np.reshape(arrIndx, (arr.shape[0], arr.shape[1]))
-
-        intTargIndxs = []
-        for targ in targetIndxs:
-            intTargIndxs.append(int(f'{targ[0]}{targ[1]}'))
-
         slicedIDX = [m for subA in np.array_split(arrIndx, splitSize, axis=0)
                        for m in np.array_split(subA, splitSize, axis=1)]
         slicedINPUT = [m for subA in np.array_split(arr, splitSize, axis=0)
                          for m in np.array_split(subA, splitSize, axis=1)]
-
-        # Collect indices of targets in the new sub-arrays
-        targSliceIndx = []
-        pieceCount=0
-        for indxPiece, arrPiece in zip(slicedIDX, slicedINPUT):
-            for targ in intTargIndxs:
-                if targ in indxPiece:
-                    ix = np.where(targ==indxPiece)
-                    ind = pieceCount, ix[0][0], ix[1][0]
-                    targSliceIndx.append(ind)
-            pieceCount += 1
+        pieceCount = len(slicedINPUT)
 
         # Shuffle input values in receptive fields to desired shuffle strength
         for i in range(shuffleStrength):
-            s_idx, slice, row, col = self.getRandSliceAndIdxs(pieceCount, slicedINPUT)
-
             if np.random.randint(2):
-                swap1 = slice[row, col]
+                s_idx, slice, row, col = self.getRandSliceAndIdxs(pieceCount, slicedINPUT)
                 s_idx2, slice2, row2, col2 = self.getRandSliceAndIdxs(pieceCount, slicedINPUT)
-                swap2 = slice2[row2, col2]
-                if (s_idx, row, col) in targSliceIndx:
+                temp = slice[row, col]
+                slice[row, col] = slice2[row2, col2]
+                slice2[row2, col2] = temp
+
+        # Compute interference
+        targOutputStrengths = {}
+        for indxPiece, arrPiece in zip(slicedIDX, slicedINPUT):
+            for targ, targString in intTargIndxs.items():
+                if targString in indxPiece:
+                    ix = np.where(targString==indxPiece)
+                    surroundAvg = max( (np.sum(arrPiece)-arrPiece[ix])/(arrPiece.size-1), 1) # to avoid negative or zero division
+                    boostFactor = arrPiece[ix]/self.pShape.MAX_INPUT + 1 # to reward higher absolute inputs
+                    targOutputStrengths[targ] = min(np.round(boostFactor*arrPiece[ix]/surroundAvg), self.pShape.MAX_INPUT)
 
 
-
-
-
-        #############3333 use dynamic feedback to AIS change in external move!!!!!
-
-        return min(1/pValue, self.maxFiringRateOutput)
+        return targOutputStrengths
 
 
 
@@ -887,7 +893,7 @@ class Processor:
 
         if not knownSDRs:
             try:
-                knownSDRs = P.knownSDRs
+                knownSDRs = self.knownSDRs
             except:
                 print('No Known SDRs stored!')
 
@@ -915,23 +921,25 @@ class Processor:
                         sdrs in list provided
         '''
 
-        connected = []
-        for sdrName in sdr_names:
-            with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
-                attachedChC = pickle.load(ChC_handle)
-            connected.append(attachedChC)
-
-
         if len(sdr_names) == 0:
             array_size = P.pShape.input_array.shape[0]
             with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
                 self.attachedChC = pickle.load(ChC_handle)
         else:
+            connected = []
+            for sdrName in sdr_names:
+                with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
+                    attachedChC = pickle.load(ChC_handle)
+                connected.append(attachedChC)
+
             for indx in self.attachedChC.PyC_points:
                 w = []
                 for attached in connected:
                     w.append(attached.total_Active_Weight(PyC_array_element=indx))
                     avg_intW = np.round(sum(w)/len(w))
+                    if indx == (0, 0):
+                        print('w', w)
+                        print('avg', avg_intW)
                 connection = indx, self.attachedChC.PyC[indx]
                 self.attachedChC.change_Synapse_Weight(connection=connection,
                                                        change='SET',
