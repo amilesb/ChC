@@ -177,6 +177,8 @@ class ChC:
         total synapse weight for the connected chandelier cells along with
         updated individual weights for each chandelier cell.'''
         PyC_point, attached_chcs = connection
+        print('change', change)
+        print('connection', connection)
         current_tot_wght = self.total_Synapse_Weight(PyC_point)
         FLAG_NEW_CONNECTION = False
 
@@ -188,6 +190,8 @@ class ChC:
         else:
             target_tot_wght = current_tot_wght+change
             target_tot_wght = self.check_Weight_Change(target_tot_wght)
+
+        print('target tot weight', target_tot_wght)
         inc, chc_index = self.select_Chand(target_tot_wght, current_tot_wght,
                                            attached_chcs)
         chc = attached_chcs[chc_index[0]]
@@ -215,7 +219,7 @@ class ChC:
                                        FLAG_NEW_CONNECTION)
 
         current_tot_wght = current_tot_wght+inc
-        new_change = current_tot_wght-target_tot_wght
+        new_change = target_tot_wght-current_tot_wght
 
         if new_change != 0:
             self.change_Synapse_Weight(connection, change=new_change,
