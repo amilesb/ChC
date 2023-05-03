@@ -170,6 +170,7 @@ class TestChC(unittest.TestCase):
 
         ##### Test when change = RANDOM  #############
         attached_chcs = PyC_dict[(0,0)]
+        print('seeme', (pt, attached_chcs))
         self.small_ChC.change_Synapse_Weight(connection=(pt, attached_chcs))
         total_Synapse_Weight = self.small_ChC.total_Synapse_Weight(pt)
         assert 0 <= total_Synapse_Weight < self.small_ChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT

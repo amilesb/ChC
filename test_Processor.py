@@ -236,12 +236,29 @@ class TestProcessor(unittest.TestCase):
 
     def test_calcInterference(self):
         targetIndxs = [(0,2), (2, 8), (3, 2), (5, 6), (8, 1), (8, 7), (9, 3)]
-        self.processor.pShape.input_array = np.arange(100,200)
-        self.processor.pShape.input_array = np.reshape(self.processor.pShape.input_array, (10,10))
+        tester = np.zeros((10, 10))
+
+        for indx in targetIndxs:
+            tester[indx] = 255
+            self.processor.pShape.input_array = tester
 
         targetOutputStrengths = self.processor.calcInterference(targetIndxs)
 
-        print('calcInterference', targetOutputStrengths)
+        expectedResults = [30, 255, 30, 255, 22, 255, 22]
+        for i, indx in enumerate(targetIndxs):
+            assert targetOutputStrengths[indx] == expectedResults[i]
+
+
+        self.processor.pShape.input_array = np.arange(100,200)
+        self.processor.pShape.input_array = np.reshape(self.processor.pShape.input_array, (10,10))
+        targetOutputStrengths = self.processor.calcInterference(targetIndxs)
+
+        expectedResults = [1, 2, 2, 2, 2, 2, 2]
+        for i, indx in enumerate(targetIndxs):
+            assert targetOutputStrengths[indx] == expectedResults[i]
+        print('''ChC cells may help a target be found that is actually less
+        than surrounding avg input; the output will be low but may want to
+        boost this value if lots of other targs found in that sdr''')
 
 
 

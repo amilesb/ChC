@@ -833,6 +833,8 @@ class Processor:
 
         highVal = max(len(targetIndxs), self.sparseNum['high']+1)
         numRF=np.random.randint(self.sparseNum['low'], highVal)
+        print('numrf', numRF)
+        print('h', self.sparseNum['high'])
         splitSize = np.rint(np.sqrt(numRF))
 
         # Split array into smaller receptive fields
@@ -859,8 +861,11 @@ class Processor:
             for targ, targString in intTargIndxs.items():
                 if targString in indxPiece:
                     ix = np.where(targString==indxPiece)
-                    surroundAvg = max( (np.sum(arrPiece)-arrPiece[ix])/(arrPiece.size-1), 1) # to avoid negative or zero division
+                    print('arrpc size', arrPiece.size)
+                    surroundAvg = max( (np.sum(arrPiece)-arrPiece[ix])/(arrPiece.size-1), 1) # to avoid negative or zero division in next step
+                    print('surround', surroundAvg)
                     boostFactor = arrPiece[ix]/self.pShape.MAX_INPUT + 1 # to reward higher absolute inputs
+                    print('boost', boostFactor)
                     targOutputStrengths[targ] = min(np.round(boostFactor*arrPiece[ix]/surroundAvg), self.pShape.MAX_INPUT)
 
 
@@ -966,7 +971,6 @@ class Processor:
                 self.attachedChC.change_Synapse_Weight(connection=connection,
                                                        change='SET',
                                                        target_tot_wght=avg_intW)
-
 
 
     def displayInputSearch(self, plotTitle='Target Indices'):
