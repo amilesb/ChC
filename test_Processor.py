@@ -310,7 +310,7 @@ class TestProcessor(unittest.TestCase):
         for i in range(50):
             self.processor.updateChCWeightsMatchedToSDR(targ0, sdrName='TEST0')
 
-        sdr_names = {'TEST0': 1, 'TEST1': 1}
+        sdr_names = {'TEST0': 1, 'TEST1': 0.5}
         self.processor.setChCWeightsFromMatchedSDRs(sdr_names)
 
         weights = {}
@@ -319,10 +319,12 @@ class TestProcessor(unittest.TestCase):
                 tot = self.processor.attachedChC.total_Synapse_Weight((i, j))
                 weights[(i, j)] = tot
 
-        two_named = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1)]
-        for coords in (simple0+two_named):
+        for coords in simple0:
             assert weights[coords] == 20
-        assert sum(weights.values()) == 3680 # 100 values all ChC set to 40 except 16 in simple0 and two_named set to 20
+        two_named = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1)]
+        for coords in two_named:
+            assert weights[coords] == 10
+        assert sum(weights.values()) == 2760 # 100 values all ChC set to 30 except 8 in simple0 and 8 in two_named set to 30, 10 respectively
 
 
 

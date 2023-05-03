@@ -958,8 +958,9 @@ class Processor:
 
             for indx in self.attachedChC.PyC_points:
                 w = []
-                for attached in connected:
+                for i, attached in enumerate(connected):
                     w.append(attached.total_Active_Weight(PyC_array_element=indx))
+                    w[i] *= list(overlap.values())[i]
                     avg_intW = np.round(sum(w)/len(w))
                 connection = indx, self.attachedChC.PyC[indx]
                 self.attachedChC.change_Synapse_Weight(connection=connection,
