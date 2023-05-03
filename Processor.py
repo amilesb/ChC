@@ -888,7 +888,7 @@ class Processor:
                       indices
 
         Returns:
-        overlap     - list of names for all matching SDRs above the threshold
+        overlap     - dictionary with keys as sdr names and values as strengths
         '''
 
         if not knownSDRs:
@@ -899,21 +899,45 @@ class Processor:
 
         indxs = set(indxs)
         overlap = []
+        matchLength = []
         for count, SDR in enumerate(knownSDRs):
             match = indxs & set(SDR)
             if len(match) >= 8:
                 overlap.append(count)
+                matchLength.append(len(match))
 
-        return overlap
+        OL = self.calcSDRMatchStrength(overlap, matchLength)
+
+        return OL
 
 
-    def setChCWeightsFromMatchedSDRs(self, sdr_names):
+    def calcSDRMatchStrength(self, overlap, matchLength):
+        '''Accepts a list of sdr names with corresponding list of overlap match
+        length and computes a strength weight for each sdr.
+
+        Inputs:
+        sdr_names   - list of sdr names
+        matchLength - list of overlapping matches lengths
+
+        Returns:
+        OL          - dictionary with keys as sdr names and values as strengths
+        '''
+
+        olStrength = [m/max(matchLength) for m in matchLength]
+        OL = {}
+        for name, strength in zip(overlap, olStrength):
+            OL[name] = strength
+
+        return OL
+
+
+    def setChCWeightsFromMatchedSDRs(self, overlap):
         '''Accepts a list of indices and identifies any SDRs that match above a
         threshold and collects the ChC weights attached to each of those.  Uses
         these matches to compute overlap.
 
         Inputs:
-        sdr_names   - list of sdr names
+        overlap       - dictionary with keys as sdr names and values as strengths
 
 
         Returns:
@@ -921,13 +945,13 @@ class Processor:
                         sdrs in list provided
         '''
 
-        if len(sdr_names) == 0:
+        if len(overlap) == 0:
             array_size = P.pShape.input_array.shape[0]
             with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
                 self.attachedChC = pickle.load(ChC_handle)
         else:
             connected = []
-            for sdrName in sdr_names:
+            for sdrName in overlap.keys():
                 with open(f'ChC_handles/Objects/ChC_{sdrName}', 'rb') as ChC_handle:
                     attachedChC = pickle.load(ChC_handle)
                 connected.append(attachedChC)
@@ -937,9 +961,6 @@ class Processor:
                 for attached in connected:
                     w.append(attached.total_Active_Weight(PyC_array_element=indx))
                     avg_intW = np.round(sum(w)/len(w))
-                    if indx == (0, 0):
-                        print('w', w)
-                        print('avg', avg_intW)
                 connection = indx, self.attachedChC.PyC[indx]
                 self.attachedChC.change_Synapse_Weight(connection=connection,
                                                        change='SET',
