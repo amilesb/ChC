@@ -157,7 +157,7 @@ class TestProcessor(unittest.TestCase):
 
     @mock.patch('Processor.Processor.internalMove')
     @mock.patch('Processor.Processor.applyReceptiveField')
-    def test_externalMoveSEEK(self, mockedApply, mockedInternal):
+    def test_externalMove(self, mockedApply, mockedInternal):
         # trueTargs = np.where(self.intValArray > 0, 1, 0)
         # row, col = self.processor.getNonzeroIndices(trueTargs)
         # trueTargs = [(r, c) for r, c in zip(row, col)]
@@ -173,13 +173,50 @@ class TestProcessor(unittest.TestCase):
         self.processor.sparseNum['low'] = 10
 
         # Test1 first if conditional
-        sdrTag, indxs = self.processor.externalMoveSEEK(self.processor.trueTargsList)
+        sdrTag, indxs = self.processor.externalMove(self.processor.trueTargsList)
         assert sdrTag == True
 
         # Test2 Recursive Test
-        sdrTag, indxs = self.processor.externalMoveSEEK([(0, 0)])
+        sdrTag, indxs = self.processor.externalMove([(0, 0)])
         assert sdrTag == False
         assert self.processor.countEXTERNAL_MOVE == 2
+
+
+    def test_simulateExternalMove(self):
+        initalTargVal = np.sum(self.intValArray)
+        self.processor.simulateExternalMove(noiseLevel=0, blur=0, arrayNoise=0)
+        finalTargVal = np.sum(self.processor.pShape.input_array)
+
+        assert np.where(self.intValArray > 0, 1, 0).all() == np.where(self.processor.pShape.input_array > 0, 1, 0).all()
+        assert initalTargVal == finalTargVal
+
+    #
+    #
+    # @mock.patch('Processor.Processor.internalMove')
+    # @mock.patch('Processor.Processor.applyReceptiveField')
+    # def test_externalMoveSEEK(self, mockedApply, mockedInternal):
+    #     # trueTargs = np.where(self.intValArray > 0, 1, 0)
+    #     # row, col = self.processor.getNonzeroIndices(trueTargs)
+    #     # trueTargs = [(r, c) for r, c in zip(row, col)]
+    #     # self.processor.trueTargs = set(trueTargs)
+    #
+    #     mockedApply.return_value = ([], True)
+    #     mockedInternal.side_effect = [
+    #                                    [(i, i) for i in range(5, 10)],
+    #                                    self.processor.trueTargs,
+    #                                    self.processor.trueTargsList[0:4],
+    #                                    self.processor.trueTargsList[4:]
+    #                                  ]
+    #     self.processor.sparseNum['low'] = 10
+    #
+    #     # Test1 first if conditional
+    #     sdrTag, indxs = self.processor.externalMoveSEEK(self.processor.trueTargsList)
+    #     assert sdrTag == True
+    #
+    #     # Test2 Recursive Test
+    #     sdrTag, indxs = self.processor.externalMoveSEEK([(0, 0)])
+    #     assert sdrTag == False
+    #     assert self.processor.countEXTERNAL_MOVE == 2
 
 
     def test_simulateExternalMove(self):

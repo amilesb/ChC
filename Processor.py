@@ -219,7 +219,7 @@ class Processor:
         # print('finished internalMove', targetIndxs)
 
         if mode == 'Seek':
-            sdrFoundWholeFlag, targetIndxs = self.externalMoveSEEK(targetIndxs)
+            sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
         # print('finished externalMove', targetIndxs)
 
         if plot:
@@ -468,74 +468,14 @@ class Processor:
         return targetIndxs
 
 
-    def externalMoveSEEK(self, targetIndxs, allPrevTargIndxs=None, mode='Seek'):
+    def externalMove(self, targetIndxs, allPrevTargIndxs=None, mode='Seek'):
         '''External movement to simulate changing gradients across input space..
 
         Inputs:
         targetIndxs       - list of indices of input cells above the (direct
                             AIS/ChC modulated) and (indirect dynamic -- meant to
                             simulate AIS length changing) self.threshold
-
-        Returns:
-        sdrFoundWholeFlag - Boolean indicating that if true then indexes
-                            corresponding to SDR match the lower bound of ground
-                            truth indices.  If false, targetIndxs will be
-                            incomplete i.e. less than sparse lower bound
-                            indicating ambiguity.
-        suspectedTargs    - list of row, col indices for found targets
-        '''
-
-        originalInput = self.pShape.input_array.copy()
-        keepGoing = True
-
-        while keepGoing:
-            if allPrevTargIndxs:
-                suspectedTargs = set(targ for targ in targetIndxs)|allPrevTargIndxs
-            else:
-                suspectedTargs = set(targ for targ in targetIndxs)
-            correctTargs = suspectedTargs & self.trueTargs
-            incorrect = suspectedTargs - self.trueTargs
-
-            self.correctTargsFound.update(correctTargs)
-            self.falseTargsFound.update(incorrect)
-
-            # For debugging and visulization
-            # self.displayInputSearch(self, plotTitle='from internalMove Target Indices')                             )
-
-            if len(correctTargs) >= self.sparseNum['low']:
-                if len(suspectedTargs) > self.sparseNum['high']:
-                    return False, list(suspectedTargs)
-                else:
-                    return True, list(suspectedTargs)
-
-            self.simulateExternalMove(self.noiseLevel)
-            self.countEXTERNAL_MOVE += 1
-
-            # Move AIS on suspected targs to bias network to look for new suspects
-            for indx in self.attachedChC.PyC_points:
-                if indx in suspectedTargs:
-                    self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-1) # Move AIS farther from cell body
-                else:
-                    self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
-
-            newIndxs, confidenceFlag = self.applyReceptiveField()
-            newIndxs = self.internalMove(newIndxs)
-            # self.internalMovesCounter.append(self.countINTERNAL_MOVE)
-            # self.countINTERNAL_MOVE = 0
-
-            self.pShape.input_array = originalInput.copy()
-
-            return self.externalMoveSEEK(targetIndxs=newIndxs,
-                                         allPrevTargIndxs=suspectedTargs)
-
-
-    def externalMoveINFER(self, targetIndxs, mode='Inference'):
-        '''External movement to simulate changing gradients across input space..
-
-        Inputs:
-        targetIndxs       - list of indices of input cells above the (direct
-                            AIS/ChC modulated) and (indirect dynamic -- meant to
-                            simulate AIS length changing) self.threshold
+        allPrevTargIndxs  - set of previously selected target indices
 
         Returns:
         sdrFoundWholeFlag - Boolean indicating that if true then indexes
@@ -550,13 +490,21 @@ class Processor:
 
         while True:
             suspectedTargs = set(targ for targ in targetIndxs)
+            if (mode == 'Seek') and allPrevTargIndxs:
+                suspectedTargs.update(allPrevTargIndxs)
+
             correctTargs = suspectedTargs & self.trueTargs
+            incorrect = suspectedTargs - self.trueTargs
+
+            if mode == 'Seek':
+                self.correctTargsFound.update(correctTargs)
+                self.falseTargsFound.update(incorrect)
 
             if len(correctTargs) >= self.sparseNum['low']:
-                return True, list(suspectedTargs)
-
-            # For debugging and visulization
-            # self.displayInputSearch(self, plotTitle='from internalMove Target Indices'))
+                if len(suspectedTargs) <= self.sparseNum['high']:
+                    return True, list(suspectedTargs)
+                elif mode=='Seek':
+                    return False, list(suspectedTargs)
 
             noiseEst = self.noiseEstimate(suspectedTargs)
             self.simulateExternalMove(noiseEst)
@@ -565,28 +513,30 @@ class Processor:
             # Move AIS on suspected targs to bias network to look for new suspects
             for indx in self.attachedChC.PyC_points:
                 if indx in suspectedTargs:
-                    self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-3) # Move AIS farther from cell body
+                    self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-1) # Move AIS farther from cell body
                 else:
-                    self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+3) # Move AIS closer to cell body
+                    self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
 
+            newIndxs, confidenceFlag = self.applyReceptiveField(mode=mode)
+            if mode == 'Infer':
+                self.internalMovesCounter.append(self.countINTERNAL_MOVE)
+                self.countINTERNAL_MOVE = 0
 
-            newIndxs, confidenceFlag = self.applyReceptiveField(mode='Infer')
-            self.internalMovesCounter.append(self.countINTERNAL_MOVE)
-            self.countINTERNAL_MOVE = 0
-            newIndxs = self.internalMove(newIndxs, mode='Infer')
-            overlap = self.findNamesForMatchingSDRs(newIndxs)
-            P.setChCWeightsFromMatchedSDRs(overlap)
+            newIndxs = self.internalMove(newIndxs, mode=mode)
 
+            if mode == 'Infer':
+                overlap = self.findNamesForMatchingSDRs(newIndxs)
+                P.setChCWeightsFromMatchedSDRs(overlap)
 
             self.pShape.input_array = originalInput.copy()
 
             return self.externalMove(targetIndxs=newIndxs,
-                                     allPrevTargIndxs=suspectedTargs)
+                                     allPrevTargIndxs=suspectedTargs,
+                                     mode=mode)
 
-        #############3333 use dynamic feedback from interference based firing rate to AIS change in external move!!!!!
 
-
-    # def externalMove(self, targetIndxs, allPrevTargIndxs=None):
+    #
+    # def externalMoveSEEK(self, targetIndxs, allPrevTargIndxs=None, mode='Seek'):
     #     '''External movement to simulate changing gradients across input space..
     #
     #     Inputs:
@@ -604,8 +554,9 @@ class Processor:
     #     '''
     #
     #     originalInput = self.pShape.input_array.copy()
+    #     keepGoing = True
     #
-    #     while True:
+    #     while keepGoing:
     #         if allPrevTargIndxs:
     #             suspectedTargs = set(targ for targ in targetIndxs)|allPrevTargIndxs
     #         else:
@@ -642,8 +593,67 @@ class Processor:
     #
     #         self.pShape.input_array = originalInput.copy()
     #
+    #         return self.externalMoveSEEK(targetIndxs=newIndxs,
+    #                                      allPrevTargIndxs=suspectedTargs)
+    #
+    #
+    # def externalMoveINFER(self, targetIndxs, mode='Inference'):
+    #     '''External movement to simulate changing gradients across input space..
+    #
+    #     Inputs:
+    #     targetIndxs       - list of indices of input cells above the (direct
+    #                         AIS/ChC modulated) and (indirect dynamic -- meant to
+    #                         simulate AIS length changing) self.threshold
+    #
+    #     Returns:
+    #     sdrFoundWholeFlag - Boolean indicating that if true then indexes
+    #                         corresponding to SDR match the lower bound of ground
+    #                         truth indices.  If false, targetIndxs will be
+    #                         incomplete i.e. less than sparse lower bound
+    #                         indicating ambiguity.
+    #     suspectedTargs    - list of row, col indices for found targets
+    #     '''
+    #
+    #     originalInput = self.pShape.input_array.copy()
+    #
+    #     while True:
+    #         suspectedTargs = set(targ for targ in targetIndxs)
+    #         correctTargs = suspectedTargs & self.trueTargs
+    #
+    #         if len(correctTargs) >= self.sparseNum['low']:
+    #             return True, list(suspectedTargs)
+    #
+    #         # For debugging and visulization
+    #         # self.displayInputSearch(self, plotTitle='from internalMove Target Indices'))
+    #
+    #         noiseEst = self.noiseEstimate(suspectedTargs)
+    #         self.simulateExternalMove(noiseEst)
+    #         self.countEXTERNAL_MOVE += 1
+    #
+    #         # Move AIS on suspected targs to bias network to look for new suspects
+    #         for indx in self.attachedChC.PyC_points:
+    #             if indx in suspectedTargs:
+    #                 self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-3) # Move AIS farther from cell body
+    #             else:
+    #                 self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+3) # Move AIS closer to cell body
+    #
+    #
+    #         newIndxs, confidenceFlag = self.applyReceptiveField(mode='Infer')
+    #         self.internalMovesCounter.append(self.countINTERNAL_MOVE)
+    #         self.countINTERNAL_MOVE = 0
+    #         newIndxs = self.internalMove(newIndxs, mode='Infer')
+    #         overlap = self.findNamesForMatchingSDRs(newIndxs)
+    #         P.setChCWeightsFromMatchedSDRs(overlap)
+    #
+    #
+    #         self.pShape.input_array = originalInput.copy()
+    #
     #         return self.externalMove(targetIndxs=newIndxs,
     #                                  allPrevTargIndxs=suspectedTargs)
+    #
+    #     #############3333 use dynamic feedback from interference based firing rate to AIS change in external move!!!!!
+    #
+
 
 
     def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):
