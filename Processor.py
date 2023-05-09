@@ -521,10 +521,11 @@ class Processor:
                     self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
 
             # Collect new target indices
+            allPrevTargIndxs = targetIndxs
             targetIndxs, confidenceFlag = self.applyReceptiveField(mode=mode)
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0
-            targetIndxs = self.internalMove(newIndxs, mode=mode)
+            targetIndxs = self.internalMove(targetIndxs, mode=mode)
 
             if mode == 'Infer':
                 overlap = self.findNamesForMatchingSDRs(targetIndxs)
