@@ -489,8 +489,6 @@ class Processor:
         allPrevTargIndxs=None
 
         while True:
-            targOutputStrengths = self.calcInterference(targetIndxs)
-
             # Compare selected indices to true targets
             suspectedTargs = set(targ for targ in targetIndxs)
             if (mode == 'Seek') and allPrevTargIndxs:
@@ -512,6 +510,8 @@ class Processor:
 
             # Terimnation critieria not met; execute external movement
             noiseEst = self.noiseEstimate(suspectedTargs)
+            noiseEst = int(np.rint(noiseEst*np.max(self.pShape.input_array)))
+            targOutputStrengths = self.calcInterference(targetIndxs, noiseEst)
             self.simulateExternalMove(noiseEst)
             self.countEXTERNAL_MOVE += 1
 
@@ -760,10 +760,10 @@ class Processor:
 
 
     def getRandSliceAndIdxs(self, pieceCount, slicedINPUT):
-        rand_slice_idx = np.randomrandint(0, pieceCount)
-        slice = slicedINPUT[rand_idx_1]
-        rand_idx_row = np.randomrandint(0, slice.shape[0])
-        rand_idx_col = np.randomrandint(0, slice.shape[1])
+        rand_slice_idx = np.random.randint(0, pieceCount)
+        slice = slicedINPUT[rand_slice_idx]
+        rand_idx_row = np.random.randint(0, slice.shape[0])
+        rand_idx_col = np.random.randint(0, slice.shape[1])
 
         return rand_slice_idx, slice, rand_idx_row, rand_idx_col
 
