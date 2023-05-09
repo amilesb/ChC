@@ -489,6 +489,8 @@ class Processor:
         allPrevTargIndxs=None
 
         while True:
+            targOutputStrengths = self.calcInterference(targetIndxs)
+
             # Compare selected indices to true targets
             suspectedTargs = set(targ for targ in targetIndxs)
             if (mode == 'Seek') and allPrevTargIndxs:
@@ -752,6 +754,7 @@ class Processor:
                     boostFactor = arrPiece[ix]/self.pShape.MAX_INPUT + 1 # to reward higher absolute inputs
                     targOutputStrengths[targ] = min(np.round(boostFactor*arrPiece[ix]/surroundAvg), self.pShape.MAX_INPUT)
 
+        targOutputStrengths = {k: v for k, v in sorted(targOutputStrengths.items(), key=lambda x:x[1])}
 
         return targOutputStrengths
 
