@@ -212,7 +212,7 @@ class Processor:
                            indicating ambiguity.
         '''
 
-        targetIndxs, confidenceFlag = self.applyReceptiveField(mode=mode)
+        targetIndxs = self.applyReceptiveField(mode=mode)
 
         # print('finished applyRF', sorted(targetIndxs))
         targetIndxs = self.internalMove(targetIndxs, mode=mode)
@@ -274,9 +274,7 @@ class Processor:
                 num = self.pShape.input_array.size
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
-            sdrFoundWholeFlag=False
-        else:
-            # mode is 'inference'
+        else: # mode is 'inference'
             weightsAIS = self.calcWeights()
             step = self.pShape.input_array.max()/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
             weightsAdjusted = self.pShape.input_array-(weightsAIS*step)
@@ -288,9 +286,8 @@ class Processor:
                 num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
-            sdrFoundWholeFlag=True
 
-        return targetIndxs, sdrFoundWholeFlag
+        return targetIndxs
 
 
     def calcWeights(self, RF_AvgToMax=1):
@@ -358,29 +355,29 @@ class Processor:
         minSaccades=3
 
         while KeepGoing:
+            # Calculate noise and set realted variables (minSaccades noiseFilter)
             self.countINTERNAL_MOVE += 1
             saccadeNum += 1
             self.pShape.input_array = originalInput.copy() # restore input
             noiseEst.append(self.noiseEstimate(targetIndxs))
             noise = sum(noiseEst)/len(noiseEst)
+            minSaccades = max(minSaccades*noise, 7)
+            noiseFilter = saccadeNum*np.exp(-noise)
             if mode=='Seek':
                 sigma = self.gaussBlurSigma
                 scale = self.noiseLevel
-                noiseFilter = min(saccadeNum-(saccadeNum*(1-noise)), 2)
             else:
                 sigma = scale = sum(noiseEst)/len(noiseEst)
-                noiseFilter = max(saccadeNum-(saccadeNum*(1-noise)), 2)
+
+            # Execute internal movement and extract new targets to be added to internal counter
             self.pShape.blur_Array(sigma=sigma)
             self.pShape.add_Noise(scale=scale)
-            newIndxs, confidenceFlag = self.applyReceptiveField(mode=mode, num=num)
+            newIndxs = self.applyReceptiveField(mode=mode, num=num)
             self.targsINTERNAL.update(newIndxs)
 
+            # Filter collected targets in counter based on noise criteria set above
+            # Note structure of noise in if statements - increase noise results in more saccades but relaxed filtration-
             if saccadeNum > minSaccades:
-                # noise = sum(noiseEst)/len(noiseEst)
-                # if mode=='Seek':
-                #     noiseFilter = min(saccadeNum-(saccadeNum*(1-noise)), 2)
-                # else:
-                #     noiseFilter = max(saccadeNum-(saccadeNum*(1-noise)), 2)
                 suspectedFalseTargsDueToNoise = []
                 targetIndxs = []
                 for targ in self.targsINTERNAL:
@@ -389,9 +386,10 @@ class Processor:
                     else:
                         targetIndxs.append(targ)
 
+            # Collect target indices
             if mode == 'Seek':
                 stopCheck = np.random.randint(saccadeNum)
-                if stopCheck >= minSaccades or saccadeNum >= 8:
+                if stopCheck >= minSaccades:
                     KeepGoing=False # Terminate while loop
                     targetIndxs = self.selectFromMostCommon()
             else: # mode is 'inference'
@@ -411,7 +409,7 @@ class Processor:
                     else:
                         num = self.sparseNum['high']
                     flag = True
-                    newIndxs, confidenceFlag = self.applyReceptiveField(mode=mode, num=num)
+                    newIndxs = self.applyReceptiveField(mode=mode, num=num)
 
         return targetIndxs
 
@@ -430,17 +428,18 @@ class Processor:
         totalValOfTargsFound = 0
         for i in targetIndxs:
             totalValOfTargsFound += self.pShape.input_array[i[0], i[1]]
-        noiseEst = totalValOfTargsFound/np.sum(self.pShape.input_array)
+        surround = np.sum(self.pShape.input_array)-totalValOfTargsFound
+        surroundAvg = surround/max(self.pShape.input_array.size-len(targetIndxs), 1)
+        normalizedSA = max(surroundAvg*len(targetIndxs), 1) # to avoid negative or zero division
+        noiseEst = normalizedSA/max(totalValOfTargsFound, 1)
 
         return noiseEst
 
 
-    # def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
-    #     '''Helper function to remove suspected false targets from consideration.'''
-    #        Note this is a recursive function built on top of 2 nested recursive
-        # functions (internalMove and applyReceptiveField)
-    #     for falseTarg in suspectedFalseTargsDueToNoise:
-    #         self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
+    def thresholdOutSuspFalseTargs(self, suspectedFalseTargsDueToNoise):
+        '''Helper function to remove suspected false targets from consideration.'''
+        for falseTarg in suspectedFalseTargsDueToNoise:
+            self.AIS.ais[falseTarg] = np.floor(self.AIS.ais[falseTarg]/2) # move ais away from cell body
 
 
     def selectFromMostCommon(self):
@@ -524,7 +523,7 @@ class Processor:
 
             # Collect new target indices
             allPrevTargIndxs = targetIndxs
-            targetIndxs, confidenceFlag = self.applyReceptiveField(mode=mode)
+            targetIndxs = self.applyReceptiveField(mode=mode)
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
             self.countINTERNAL_MOVE = 0
             targetIndxs = self.internalMove(targetIndxs, mode=mode)
@@ -750,7 +749,7 @@ class Processor:
             for targ, targString in intTargIndxs.items():
                 if targString in indxPiece:
                     ix = np.where(targString==indxPiece)
-                    surroundAvg = max( (np.sum(arrPiece)-arrPiece[ix])/(arrPiece.size-1), 1) # to avoid negative or zero division in next step
+                    surroundAvg = max( (np.sum(arrPiece)-arrPiece[ix])/max(arrPiece.size-1, 1), 1) # to avoid negative or zero division in next step
                     boostFactor = arrPiece[ix]/self.pShape.MAX_INPUT + 1 # to reward higher absolute inputs
                     targOutputStrengths[targ] = min(np.round(boostFactor*arrPiece[ix]/surroundAvg), self.pShape.MAX_INPUT)
 

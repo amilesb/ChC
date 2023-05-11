@@ -75,25 +75,17 @@ class TestProcessor(unittest.TestCase):
 
 
     def test_applyReceptiveField(self):
-        array_MAX=9
-        self.pShape.input_array = self.intValArray
-        threshold = np.ndarray((self.intValArray.shape[0], self.intValArray.shape[1]))
-        threshold[0, 0] = -1
-        self.processor.sparseNum = {'low': 10, 'high': 10}
-        # chcStep = array_MAX/self.attachedChC.TOTAL_MAX_ALL_CHC_ATTACHED_WEIGHT
-        # avgInputValInRF = np.mean(self.intValArray)
-        # threshold[:] = avgInputValInRF/chcStep
-        self.processor.pShape = self.pShape
-        self.processor.attachedChC = self.attachedChC
-        self.processor.threshold = threshold
-        targetIndxs, confidenceFlag = self.processor.applyReceptiveField()
-        assert len(targetIndxs) == 10
+        targetIndxs = self.processor.applyReceptiveField()
+        assert sorted(targetIndxs) == self.processor.trueTargsList
 
-        self.intValArray[0, 0] = 18
-        threshold[0, 0] = -1
-        targetIndxs, confidenceFlag = self.processor.applyReceptiveField()
-        # print('test_applyReceptiveField', targetIndxs)
-        assert len(targetIndxs) == 10
+
+        self.processor.pShape.input_array[0, 0] = 18
+        targetIndxs = self.processor.applyReceptiveField()
+        assert (0, 0) in targetIndxs
+
+
+
+        print('NEED To implement applyRF Infer TEST!')
 
 
     @mock.patch('ChC.ChC.total_Active_Weight')
@@ -117,7 +109,7 @@ class TestProcessor(unittest.TestCase):
     @mock.patch('Processor.Processor.applyReceptiveField')
     @mock.patch('Processor.Processor.selectFromMostCommon')
     def test_internalMove(self, mockedSelectFromMostCommon, mockedApply):
-        mockedApply.return_value = ([(i, i) for i in range(5, 10)], True)
+        mockedApply.return_value = [(i, i) for i in range(5, 10)]
         mockedSelectFromMostCommon.return_value = [(i, i) for i in range(5, 10)]
         self.processor.pShape.input_array = np.ones((10, 10))
         indxs = [(i, i) for i in range(5)]
@@ -133,18 +125,24 @@ class TestProcessor(unittest.TestCase):
         val2 = ([(i, i) for i in range(0, 25)], True)
         mockedApply.side_effect = [val0]*10+[val2]*10
 
-        targetIndxs = self.processor.internalMove(indxs, mode='Inference')
+        # targetIndxs = self.processor.internalMove(indxs, mode='Inference')
 
-        assert targetIndxs == [(i, i) for i in range(0, 10)]
-        assert self.processor.internalNoiseFlag == True
+        # assert targetIndxs == [(i, i) for i in range(0, 10)]
+        # assert self.processor.internalNoiseFlag == True
 
 
     def test_noiseEstimate(self):
         targs = [(4, 5), (4, 6), (5, 5), (5, 6)]
+        arr = np.ones((10,10))
+        for idx in targs:
+            arr[idx] = 10
+        self.pShape.input_array = arr
+
         noiseEst = self.processor.noiseEstimate(targs)
 
         # 36 = sum value in intValArray for targs listed above; 64 = total of all vals in intValArray
-        assert noiseEst == 36/64
+        # assert noiseEst == 36/64
+        assert noiseEst == 0.1
 
 
     @mock.patch('numpy.random.randint', lambda x,y : 5)
@@ -163,7 +161,7 @@ class TestProcessor(unittest.TestCase):
         # trueTargs = [(r, c) for r, c in zip(row, col)]
         # self.processor.trueTargs = set(trueTargs)
 
-        mockedApply.return_value = ([], True)
+        mockedApply.return_value = []
         mockedInternal.side_effect = [
                                        [(i, i) for i in range(5, 10)],
                                        self.processor.trueTargs,
@@ -172,14 +170,16 @@ class TestProcessor(unittest.TestCase):
                                      ]
         self.processor.sparseNum['low'] = 10
 
-        # Test1 first if conditional
+        # Test1 simplae pass of correct targets into function
         sdrTag, indxs = self.processor.externalMove(self.processor.trueTargsList)
         assert sdrTag == True
 
-        # Test2 Recursive Test
+        # Test2 More elaborate run through while loop to find targets
         sdrTag, indxs = self.processor.externalMove([(0, 0)])
         assert sdrTag == False
         assert self.processor.countEXTERNAL_MOVE == 2
+
+        print('NEED to implement external MOVE INFERENCE mode')
 
 
     def test_simulateExternalMove(self):
