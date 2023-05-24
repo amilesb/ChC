@@ -250,13 +250,10 @@ class Processor:
 
         Inputs:
         mode           - String equal to 'Seek', or 'Infer'
-        mask           - binary numpy array with which to threshold out
-                         unwanted indices in order to refine a search
+        num            - Integer number of target indices to extract
 
         Returns:
         targetIndxs      - list of row, col indices for found targets
-        confidenceFlag   - boolean based on if targets were found through 2
-                           seperate filtrations or not
         '''
 
         self.countAPPLY_RF += 1
@@ -355,7 +352,7 @@ class Processor:
         minSaccades=3
 
         while KeepGoing:
-            # Calculate noise and set realted variables (minSaccades noiseFilter)
+            # Calculate noise and set related variables (minSaccades noiseFilter)
             self.countINTERNAL_MOVE += 1
             saccadeNum += 1
             self.pShape.input_array = originalInput.copy() # restore input
@@ -392,7 +389,7 @@ class Processor:
                 if stopCheck >= minSaccades:
                     KeepGoing=False # Terminate while loop
                     targetIndxs = self.selectFromMostCommon()
-            else: # mode is 'inference'
+            elif saccadeNum > minSaccades: # mode is 'inference' and need saccadeNum > minSaccades
                 if self.sparseNum['high'] < len(targetIndxs):
                     targetIndxs = [i[0] for i in self.targsINTERNAL.most_common(self.sparseNum['high'])]
                 if self.sparseNum['low'] <= len(targetIndxs):
@@ -404,10 +401,9 @@ class Processor:
                     KeepGoing=False
                 else:
                     if num:
-                        num += noiseFilter**2
-                        num = min(self.pShape.input_array.size, num)
+                        num += np.floor(self.sparseNum['low']*np.exp(noise))
                     else:
-                        num = self.sparseNum['high']
+                        num = np.floor(self.sparseNum['low']*np.exp(noise))
                     flag = True
                     newIndxs = self.applyReceptiveField(mode=mode, num=num)
 
@@ -422,7 +418,7 @@ class Processor:
         targetIndxs     - list of indices of suspected targets
 
         Returns:
-        noiseEst        - value equal to total value of targs / sum of input
+        noiseEst        - value equal to averageSurround / targValues
         '''
 
         totalValOfTargsFound = 0

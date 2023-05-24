@@ -75,17 +75,42 @@ class TestProcessor(unittest.TestCase):
 
 
     def test_applyReceptiveField(self):
+        # Test Seek
         targetIndxs = self.processor.applyReceptiveField()
         assert sorted(targetIndxs) == self.processor.trueTargsList
-
 
         self.processor.pShape.input_array[0, 0] = 18
         targetIndxs = self.processor.applyReceptiveField()
         assert (0, 0) in targetIndxs
 
+        # Test Infer
+        # Set inputs high enough to keep true targets above noise level and set 0, 0 to low value to show it does not get selected
+        self.processor.pShape.input_array[0, 0] = 1
+        self.processor.pShape.input_array[1, 1] = 18
+        self.processor.pShape.input_array[1, 4] = 18
+        self.processor.pShape.input_array[3, 0] = 18
+        self.processor.pShape.input_array[4, 1] = 18
+        targetIndxs = self.processor.applyReceptiveField(mode='Infer')
+
+        assert self.processor.trueTargsList == sorted(targetIndxs)
 
 
-        print('NEED To implement applyRF Infer TEST!')
+        self.processor.pShape.input_array = np.arange(11, 111).reshape(10, 10)
+        toFind = [(i, i) for i in range(10)]
+        for indx in self.processor.attachedChC.PyC_points:
+            connection = indx, self.processor.attachedChC.PyC[indx]
+            if indx in toFind:
+                self.processor.attachedChC.change_Synapse_Weight(connection=connection,
+                                                                 change='SET',
+                                                                 target_tot_wght=0)
+            else:
+                self.processor.attachedChC.change_Synapse_Weight(connection=connection,
+                                                                 change='SET',
+                                                                 target_tot_wght=40)
+                self.processor.AIS.ais[indx] = 0
+
+        targetIndxs = self.processor.applyReceptiveField(mode='Infer')
+        assert toFind == sorted(targetIndxs)
 
 
     @mock.patch('ChC.ChC.total_Active_Weight')
@@ -121,14 +146,14 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.internalNoiseFlag == False
 
         # TEST2 force internal move to execute else (infer) block
-        val0 = ([(i, i) for i in range(5, 10)], True)
-        val2 = ([(i, i) for i in range(0, 25)], True)
+        val0 = [(i, i) for i in range(5, 10)]
+        val2 = [(i, i) for i in range(0, 25)]
         mockedApply.side_effect = [val0]*10+[val2]*10
 
-        # targetIndxs = self.processor.internalMove(indxs, mode='Inference')
+        targetIndxs = self.processor.internalMove(indxs, mode='Inference')
 
-        # assert targetIndxs == [(i, i) for i in range(0, 10)]
-        # assert self.processor.internalNoiseFlag == True
+        assert targetIndxs == [(i, i) for i in range(0, 10)]
+        assert self.processor.internalNoiseFlag == True
 
 
     def test_noiseEstimate(self):
