@@ -178,9 +178,11 @@ class TestProcessor(unittest.TestCase):
         assert len(targetIndxs) == 5
 
 
+    @mock.patch('Processor.Processor.setChCWeightsFromMatchedSDRs')
+    @mock.patch('Processor.Processor.findNamesForMatchingSDRs')
     @mock.patch('Processor.Processor.internalMove')
     @mock.patch('Processor.Processor.applyReceptiveField')
-    def test_externalMove(self, mockedApply, mockedInternal):
+    def test_externalMove(self, mockedApply, mockedInternal, mockedFindNames, mockedSetChCWeights):
         # trueTargs = np.where(self.intValArray > 0, 1, 0)
         # row, col = self.processor.getNonzeroIndices(trueTargs)
         # trueTargs = [(r, c) for r, c in zip(row, col)]
@@ -190,8 +192,7 @@ class TestProcessor(unittest.TestCase):
         mockedInternal.side_effect = [
                                        [(i, i) for i in range(5, 10)],
                                        self.processor.trueTargs,
-                                       self.processor.trueTargsList[0:4],
-                                       self.processor.trueTargsList[4:]
+                                       self.processor.trueTargs
                                      ]
         self.processor.sparseNum['low'] = 10
 
@@ -204,7 +205,13 @@ class TestProcessor(unittest.TestCase):
         assert sdrTag == False
         assert self.processor.countEXTERNAL_MOVE == 2
 
-        print('NEED to implement external MOVE INFERENCE mode')
+        # TEST Inference mode
+        print('zebra')
+        mockedFindNames.return_value = 'TEST'
+        sdrTag, indxs = self.processor.externalMove([(0, 0)], mode='Infer')
+
+        assert sdrTag == True
+        assert sorted(indxs) == sorted(self.processor.trueTargs)
 
 
     def test_simulateExternalMove(self):
@@ -214,34 +221,6 @@ class TestProcessor(unittest.TestCase):
 
         assert np.where(self.intValArray > 0, 1, 0).all() == np.where(self.processor.pShape.input_array > 0, 1, 0).all()
         assert initalTargVal == finalTargVal
-
-    #
-    #
-    # @mock.patch('Processor.Processor.internalMove')
-    # @mock.patch('Processor.Processor.applyReceptiveField')
-    # def test_externalMoveSEEK(self, mockedApply, mockedInternal):
-    #     # trueTargs = np.where(self.intValArray > 0, 1, 0)
-    #     # row, col = self.processor.getNonzeroIndices(trueTargs)
-    #     # trueTargs = [(r, c) for r, c in zip(row, col)]
-    #     # self.processor.trueTargs = set(trueTargs)
-    #
-    #     mockedApply.return_value = ([], True)
-    #     mockedInternal.side_effect = [
-    #                                    [(i, i) for i in range(5, 10)],
-    #                                    self.processor.trueTargs,
-    #                                    self.processor.trueTargsList[0:4],
-    #                                    self.processor.trueTargsList[4:]
-    #                                  ]
-    #     self.processor.sparseNum['low'] = 10
-    #
-    #     # Test1 first if conditional
-    #     sdrTag, indxs = self.processor.externalMoveSEEK(self.processor.trueTargsList)
-    #     assert sdrTag == True
-    #
-    #     # Test2 Recursive Test
-    #     sdrTag, indxs = self.processor.externalMoveSEEK([(0, 0)])
-    #     assert sdrTag == False
-    #     assert self.processor.countEXTERNAL_MOVE == 2
 
 
     def test_simulateExternalMove(self):
@@ -346,6 +325,7 @@ class TestProcessor(unittest.TestCase):
         assert OL[1] == 1
         assert OL[2] == 0.75
 
+
     def test_setChCWeightsFromMatchedSDRs(self):
         '''sdrName "TEST{i}" created and saved to directory similar to
         test_updateChCWeightsMatchedToSDR(self)'''
@@ -368,6 +348,9 @@ class TestProcessor(unittest.TestCase):
             new_file_T = os.path.join(DIR2, f'targs_TEST{i}')
             os.rename(old_file_C, new_file_C)
             os.rename(old_file_T, new_file_T)
+
+        # Test with No Overlap - nothing to assert as weight change random
+        self.processor.setChCWeightsFromMatchedSDRs({})
 
         # SIMPLE TEST
         for i in range(50):
@@ -469,3 +452,34 @@ if __name__ == '__main__':
     #     testArray *= 40
     #
     #     assert self.processor.AIS.ais.all() == testArray.all()
+
+
+
+
+        #
+        #
+        # @mock.patch('Processor.Processor.internalMove')
+        # @mock.patch('Processor.Processor.applyReceptiveField')
+        # def test_externalMoveSEEK(self, mockedApply, mockedInternal):
+        #     # trueTargs = np.where(self.intValArray > 0, 1, 0)
+        #     # row, col = self.processor.getNonzeroIndices(trueTargs)
+        #     # trueTargs = [(r, c) for r, c in zip(row, col)]
+        #     # self.processor.trueTargs = set(trueTargs)
+        #
+        #     mockedApply.return_value = ([], True)
+        #     mockedInternal.side_effect = [
+        #                                    [(i, i) for i in range(5, 10)],
+        #                                    self.processor.trueTargs,
+        #                                    self.processor.trueTargsList[0:4],
+        #                                    self.processor.trueTargsList[4:]
+        #                                  ]
+        #     self.processor.sparseNum['low'] = 10
+        #
+        #     # Test1 first if conditional
+        #     sdrTag, indxs = self.processor.externalMoveSEEK(self.processor.trueTargsList)
+        #     assert sdrTag == True
+        #
+        #     # Test2 Recursive Test
+        #     sdrTag, indxs = self.processor.externalMoveSEEK([(0, 0)])
+        #     assert sdrTag == False
+        #     assert self.processor.countEXTERNAL_MOVE == 2

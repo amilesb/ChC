@@ -6,7 +6,7 @@ import random
 import os.path
 import pickle
 from scipy import stats, ndimage
-from collections import Counter
+from collections import Counter, defaultdict
 
 from ChC import ChC, AIS
 from Polygon import Polygon, Target
@@ -482,6 +482,7 @@ class Processor:
 
         originalInput = self.pShape.input_array.copy()
         allPrevTargIndxs=None
+        indxDecay = defaultdict(lambda:1)
 
         while True:
             # Compare selected indices to true targets
@@ -498,26 +499,32 @@ class Processor:
 
             # Termination of while loop criteria
             if len(correctTargs) >= self.sparseNum['low']:
-                if len(suspectedTargs) <= self.sparseNum['high']:
+                if len(suspectedTargs) <= self.sparseNum['high']: # Note inference mode satisfies this constraint by default
                     return True, list(suspectedTargs)
                 elif mode=='Seek':
                     return False, list(suspectedTargs)
 
-            # Terimnation critieria not met; execute external movement
+            # Terimnation critieria not met
             noiseEst = self.noiseEstimate(suspectedTargs)
             noiseEst = int(np.rint(noiseEst*np.max(self.pShape.input_array)))
             targOutputStrengths = self.calcInterference(targetIndxs, noiseEst)
-            self.simulateExternalMove(noiseEst)
-            self.countEXTERNAL_MOVE += 1
+            indxsToAdjust = []
+            for indx, strength in targOutputStrengths.items():
+                if strength/(self.pShape.MAX_INPUT*indxDecay[indx]) < np.random.uniform(0, 1):
+                    indxsToAdjust.append(indx)
+                indxDecay[indx] += 0.2 # punish indices that have been selected
+            for indx in indxDecay: indxDecay[indx] = max(indxDecay[indx]-0.1, 1) # restore unselected indices back to default
 
             # Move AIS on suspected targs to bias network to look for new suspects
             for indx in self.attachedChC.PyC_points:
-                if indx in suspectedTargs:
+                if indx in suspectedTargs and indx in indxsToAdjust:
                     self.AIS.ais[indx] = max(0, self.AIS.ais[indx]-1) # Move AIS farther from cell body
                 else:
                     self.AIS.ais[indx] = max(self.AIS.MAX, self.AIS.ais[indx]+1) # Move AIS closer to cell body
 
-            # Collect new target indices
+            # Execute external movement; Collect new target indices
+            self.simulateExternalMove(noiseEst)
+            self.countEXTERNAL_MOVE += 1
             allPrevTargIndxs = targetIndxs
             targetIndxs = self.applyReceptiveField(mode=mode)
             self.internalMovesCounter.append(self.countINTERNAL_MOVE)
@@ -526,10 +533,17 @@ class Processor:
 
             if mode == 'Infer':
                 overlap = self.findNamesForMatchingSDRs(targetIndxs)
-                P.setChCWeightsFromMatchedSDRs(overlap)
+                self.setChCWeightsFromMatchedSDRs(overlap)
+                indxsToBiasAgainst = {k:v for k, v in indxDecay.items() if v > 1}
+                for indx, strength in indxsToBiasAgainst.items():
+                    connection = indx, self.attachedChC.PyC[indx]
+                    w = self.attachedChC.total_Active_Weight(PyC_array_element=indx)
+                    w -= round(strength)
+                    self.attachedChC.change_Synapse_Weight(connection=connection,
+                                                           change='SET',
+                                                           target_tot_wght=w)
 
             self.pShape.input_array = originalInput.copy()
-
 
 
     def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):
@@ -823,16 +837,15 @@ class Processor:
         these matches to compute overlap.
 
         Inputs:
-        overlap       - dictionary with keys as sdr names and values as strengths
-
+        overlap      - dictionary with keys as sdr names and values as strengths
 
         Returns:
-        compositeChC  - weights for a composite set of attached ChCs based on all
-                        sdrs in list provided
+        compositeChC  - weights for a composite set of attached ChCs based on
+                        all sdrs in list provided
         '''
 
         if len(overlap) == 0:
-            array_size = P.pShape.input_array.shape[0]
+            array_size = self.pShape.input_array.shape[0]
             with open(f'ChC_handles/ChC_size_{array_size}', 'rb') as ChC_handle:
                 self.attachedChC = pickle.load(ChC_handle)
             for indx in self.attachedChC.PyC_points:
@@ -856,6 +869,7 @@ class Processor:
                 self.attachedChC.change_Synapse_Weight(connection=connection,
                                                        change='SET',
                                                        target_tot_wght=avg_intW)
+
 
 
     def displayInputSearch(self, plotTitle='Target Indices'):
