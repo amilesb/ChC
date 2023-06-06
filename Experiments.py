@@ -5,11 +5,12 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 import os
+import pickle
 
 from Processor import Processor
 
 ############ FIGURE 1  ############
-
+''' Algorithm can find hidden targets even with noise'''
 def createFigure1():
 
     applyRF_N = []
@@ -128,42 +129,68 @@ def createFigure2():
 
 def createFigure3():
 
+
+    start = time.time()
+
     # Setup
-    P_Objs = []
-    knownSDRs = []
-    for i in range(1000):
-        num = np.random.randint(20, 41)
-        inputs = dict(array_size=32, numTargets=num, useTargetSubclass=True,
-                      maxInput=255, useVariableTargValue=False)
-        pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
-        P = Processor('Exact', sparseHigh=num, gaussBlurSigma=0,
-                      noiseLevel=0, display=False, pShape=pShape,
-                      attachedChC=attachedChC
-                     )
-        knownSDRs.append(P.pShape.activeElements)
-        for j in range(10):
-            sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
-            P.updateChCWeightsMatchedToSDR(targetIndxs)
-        P_Objs.append(P)
 
 
-    min=0
-    max=255
+    try:
+        with open(f'P_Objs/P_Objs.pkl', 'rb') as inp:
+            P_Objs = pickle.load(inp)
+        with open(f'P_Objs/knownSDRs.pkl', 'rb') as inp:
+            knownSDRs = pickle.load(inp)
+    except:
+        P_Objs = []
+        knownSDRs = []
+        for i in range(1000):
+            num = np.random.randint(20, 41)
+            inputs = dict(array_size=32, numTargets=num, useTargetSubclass=True,
+                          maxInput=255, useVariableTargValue=False)
+            pShape, attachedChC = Processor.buildPolygonAndAttachChC(**inputs)
+            P = Processor('Exact', sparseHigh=num, gaussBlurSigma=0,
+                          noiseLevel=0, display=False, pShape=pShape,
+                          attachedChC=attachedChC
+                         )
+            knownSDRs.append(P.pShape.activeElements)
+            for j in range(10):
+                sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False)
+                P.updateChCWeightsMatchedToSDR(targetIndxs)
+            P_Objs.append(P)
+            if i%10 == 0:
+                print('i:', i)
+        with open(f'P_Objs/P_Objs.pkl', 'wb') as outp:
+            pickle.dump(P_Objs, outp)
+        with open(f'P_Objs/knownSDRs.pkl', 'wb') as outp:
+            pickle.dump(knownSDRs, outp)
+
+        end = time.time()
+        print(f'time for sdr creation loop equal: {end-start:.1f}s')
+
+
+
+    inpMIN=0
+    inpMAX=255
     targBoost=100
-    for i in range(100):
+    for i in range(1):
         P = np.random.choice(P_Objs)
         P.knownSDRs = knownSDRs
-        indexSDR = P.pShape.activeElements
+        indexSDR = sorted(P.pShape.activeElements)
         len = P.pShape.input_array.shape[0]
-        randInput = np.random.randint(min, max, size=(len, len))
+        randInput = np.random.randint(inpMIN, inpMAX, size=(len, len))
+        print('rand input', randInput)
         for idx in indexSDR:
-            randInput[idx] = min(randInput[idx]+targBoost, max)
+            randInput[idx] = min(randInput[idx]+targBoost, inpMAX)
         P.pShape.input_array = randInput
-        targetIndxs, _ = P.applyReceptiveField(mode='Seek')
+        targetIndxs = P.applyReceptiveField(mode='Seek')
+        print('targetIndxs', sorted(targetIndxs))
+        print('indexSDR', indexSDR)
         overlap = P.findNamesForMatchingSDRs(targetIndxs, knownSDRs)
         P.AIS.resetAIS()
         P.setChCWeightsFromMatchedSDRs(overlap)
         sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False, mode='Infer')
+        print('targetIndxs', sorted(targetIndxs))
+        print('indexSDR', indexSDR)
 
 
 
@@ -266,5 +293,6 @@ Homeostasis-
 
 if __name__ == '__main__':
 
-    createFigure1()
-    createFigure2()
+    # createFigure1()
+    # createFigure2()
+    createFigure3()

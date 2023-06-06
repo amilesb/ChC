@@ -206,7 +206,6 @@ class TestProcessor(unittest.TestCase):
         assert self.processor.countEXTERNAL_MOVE == 2
 
         # TEST Inference mode
-        print('zebra')
         mockedFindNames.return_value = 'TEST'
         sdrTag, indxs = self.processor.externalMove([(0, 0)], mode='Infer')
 

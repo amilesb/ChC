@@ -218,8 +218,7 @@ class Processor:
         targetIndxs = self.internalMove(targetIndxs, mode=mode)
         # print('finished internalMove', targetIndxs)
 
-        if mode == 'Seek':
-            sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
+        sdrFoundWholeFlag, targetIndxs = self.externalMove(targetIndxs)
         # print('finished externalMove', targetIndxs)
 
         if plot:
