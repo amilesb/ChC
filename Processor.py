@@ -279,7 +279,7 @@ class Processor:
                                                     mode='mirror')
             normWeighted = weightsAdjusted-adjustedFilter
             if not num:
-                num = np.random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+                num = random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
 
@@ -543,6 +543,9 @@ class Processor:
                                                            target_tot_wght=w)
 
             self.pShape.input_array = originalInput.copy()
+
+            if self.countEXTERNAL_MOVE == 10000: # infinite loop protection
+                return False, list(suspectedTargs)
 
 
     def simulateExternalMove(self, noiseLevel=1, blur=None, arrayNoise=None):

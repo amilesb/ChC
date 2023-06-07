@@ -168,30 +168,60 @@ def createFigure3():
         print(f'time for sdr creation loop equal: {end-start:.1f}s')
 
 
-
+    applyRF = []
+    internal = []
+    external = []
+    targBoostAdded = []
     inpMIN=0
     inpMAX=255
-    targBoost=100
-    for i in range(1):
+    targBoost = [i for i in range(100, 80, -5)]
+    for i in range(len(targBoost)):
         P = np.random.choice(P_Objs)
         P.knownSDRs = knownSDRs
         indexSDR = sorted(P.pShape.activeElements)
-        len = P.pShape.input_array.shape[0]
-        randInput = np.random.randint(inpMIN, inpMAX, size=(len, len))
-        print('rand input', randInput)
+        length = P.pShape.input_array.shape[0]
+        randInput = np.random.randint(inpMIN, inpMAX, size=(length, length))
         for idx in indexSDR:
-            randInput[idx] = min(randInput[idx]+targBoost, inpMAX)
+            randInput[idx] = min(randInput[idx]+targBoost[i], inpMAX)
         P.pShape.input_array = randInput
         targetIndxs = P.applyReceptiveField(mode='Seek')
-        print('targetIndxs', sorted(targetIndxs))
-        print('indexSDR', indexSDR)
         overlap = P.findNamesForMatchingSDRs(targetIndxs, knownSDRs)
         P.AIS.resetAIS()
         P.setChCWeightsFromMatchedSDRs(overlap)
         sdrFoundWholeFlag, targetIndxs = P.extractSDR(plot=False, mode='Infer')
         print('targetIndxs', sorted(targetIndxs))
         print('indexSDR', indexSDR)
+        applyRF.append(P.countAPPLY_RF)
+        # internal.append(P.countINTERNAL_MOVE)
+        internal.append(P.internalMovesCounter)
+        external.append(P.countEXTERNAL_MOVE)
+        targBoostAdded.append(targBoost[i])
 
+
+#### NOTE applyRF, Internal, and external are effectively all the same plot!
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 3, 1)
+    # ax2 = fig.add_subplot(1, 3, 2)
+    # ax3 = fig.add_subplot(1, 3, 3)
+    # ax1.plot(targBoostAdded, applyRF, label='ApplyRF')
+    # ax2.plot(targBoostAdded, internal, label='Internal Movement')
+    # ax3.plot(targBoostAdded, external, label='External Movement')
+    # ax1.set_title('ApplyRF')
+    # ax1.set_xlabel('targBoostAdded')
+    # ax1.set_ylabel('Number')
+    # ax2.set_title('Internal')
+    # ax2.set_xlabel('targBoostAdded')
+    # ax2.set_ylabel('Number')
+    # ax3.set_title('External')
+    # ax3.set_xlabel('targBoostAdded')
+    # ax3.set_ylabel('Number')
+    #
+    # plt.show()
+
+
+    print('applyRF', applyRF)
+    print('internal', internal)
+    print('external', external)
 
 
 '''learning a new object consists of activating more and more units until object
