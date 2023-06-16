@@ -174,7 +174,7 @@ def createFigure3():
     targBoostAdded = []
     inpMIN=0
     inpMAX=255
-    targBoost = [i for i in range(100, 80, -5)]
+    targBoost = [i for i in range(100, -5, -5)]
     for i in range(len(targBoost)):
         P = np.random.choice(P_Objs)
         P.knownSDRs = knownSDRs

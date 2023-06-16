@@ -280,6 +280,7 @@ class Processor:
             normWeighted = weightsAdjusted-adjustedFilter
             if not num:
                 num = random.randint(self.sparseNum['low'], self.sparseNum['high']+1)
+            num = int(num)
             indxs = np.c_[np.unravel_index(np.argpartition(normWeighted.ravel(),-num)[-num:], normWeighted.shape)]
             targetIndxs = [tuple(x) for x in indxs.tolist()]
 
